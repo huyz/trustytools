@@ -1,5 +1,6 @@
 #!/bin/sh
 # markdown - Preview (Github-flavored) Markdown files in a web browser.
+#            Useful to checking files before pushing to github.
 #
 # Version:          1.0
 # Platforms:        OS X, GNU/Linux (not yet tested), Cygwin (not yet tested)
