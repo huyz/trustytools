@@ -1,5 +1,5 @@
 #!/bin/sh
-# Filename:         clfu.sh
+# Filename:         osxeject.sh
 # Version:          0.1
 # Description:
 #   On OS X, eject a removable disk by volume name
