@@ -4,11 +4,15 @@ Trusty Tools
 Unixy folder
 ------------
 
-*   markdown - Preview (Github-flavored) Markdown files in a web browser,
-               using [github.com](http://github.com/)'s stylesheet. Useful for
-               checking files, e.g. `README.mkd`, before pushing to github.
-*   clfu     - Quick-reference for the top 100 commands at
-               [commandlinefu.com](http://commandlinefu.com)
-*   osxeject - On OS X, eject a removable disk by volume name
-*   ldpath   - Finds location of a dynamic library by traversing the
-               search path, for Linux, OS X, and other Unix systems.
+*   markdown   - Previews (Github-flavored) Markdown files in a web browser,
+                 using [github.com](http://github.com/)'s stylesheet. Useful for
+                 checking files, e.g. `README.mkd`, before pushing to github.
+*   clfu       - Quick-reference for the top 100 commands at
+                 [commandlinefu.com](http://commandlinefu.com)
+*   osxeject   - On OS X, eject a removable disk by user-friendly volume name
+*   untar      - Extracts all or specific files from within a tar archive
+                 that's possibly compressed and/or encrypted.  Files can be
+                 filtered at the command-line and/or interactively. Supports
+                 compress, gzip, bzip2, xz, gpg, pgp
+*   ldpath     - Finds location of a dynamic library by traversing the
+                 search path, for Linux, OS X, and other Unix systems.

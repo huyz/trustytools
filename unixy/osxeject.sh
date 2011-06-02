@@ -2,7 +2,7 @@
 # Filename:         osxeject.sh
 # Version:          0.1
 # Description:
-#   On OS X, eject a removable disk by volume name
+#   On OS X, eject a removable disk by user-friendly volume name
 #
 # Platforms:        OS X
 # Author:           Huy Z, http://huyzing.com/
