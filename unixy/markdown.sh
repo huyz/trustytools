@@ -17,7 +17,7 @@
 #    ln -s ~/git/huyz/trustytools/unixy/markdown.sh ~/bin/markdown
 #
 # Usage:
-#    markdown  markdown_file...
+#    markdown markdown_file ...
 
 # Copyright (C) 2011 Huy Z
 # 
@@ -104,7 +104,7 @@ PREFIX=$TMPDIR/.markdown.$$
 ### Usage
 
 if [ $# -eq 0 ]; then
-  echo "Usage: $execname file..." >&2
+  echo "Usage: $execname markdown_file ..." >&2
   exit 1
 fi
 
