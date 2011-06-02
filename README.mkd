@@ -7,3 +7,4 @@ Unixy folder
 *   markdown - Preview (Github-flavored) Markdown files in a web browser.
                Useful for checking files before pushing to github.
 *   clfu     - Quick-reference for the top 100 commands at commandlinefu.com
+*   osxeject - On OS X, eject a removable disk by volume name
