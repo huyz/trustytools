@@ -8,3 +8,6 @@ Unixy folder
                Useful for checking files before pushing to github.
 *   clfu     - Quick-reference for the top 100 commands at commandlinefu.com
 *   osxeject - On OS X, eject a removable disk by volume name
+*   ldpath   - Finds location of a dynamic library by traversing the
+               dynamic library search path, for Linux, OS X, and other Unix
+               systems.
