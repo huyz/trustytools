@@ -133,6 +133,6 @@ echo "Converted (check your browser)."
 #    ;;
 #esac
 
-# Delayed automatically cleanup
-# NOTE: $PREFIX must not have any spaces
+# Delayed automatic cleanup
+# WARNING: $PREFIX must not have any spaces
 sh -c "sleep $CLEANUP_TIMEOUT; rm -f $PREFIX*" &
