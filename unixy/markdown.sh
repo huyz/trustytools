@@ -1,9 +1,10 @@
 #!/bin/sh
 # Filename:         markdown.sh
-# Version:          0.1
+# Version:          0.2
 # Description:
-#   Preview (Github-flavored) Markdown files in a web browser. Useful for
-#   checking files, e.g. README.mkd, before pushing to github.
+#   Preview (Github-flavored) Markdown files in a web browser. using github's
+#   stylesheet.  Useful for checking files, e.g. README.mkd, before pushing to
+#   github.
 #
 # Platforms:        OS X, GNU/Linux (not yet tested), Cygwin (not yet tested)
 # Depends:          upskirt, web browser
@@ -113,7 +114,19 @@ fi
 num=0
 for i in "$@"; do
   outfile=${PREFIX}.$num.html
-  if "$UPSKIRT" "$i" > $outfile; then
+  cat <<END >$outfile
+<!DOCTYPE html>
+  <html>
+    <head> 
+      <meta charset='utf-8'> 
+      <link href="https://d3nwyuy0nl342s.cloudfront.net/b5d0a8471557d0f44f5fcdbb6e11712779be039d/stylesheets/bundle_github.css" media="screen" rel="stylesheet" type="text/css" /> 
+    </head>
+<body>
+  <div id="readme" class="announce instapaper_body md" data-path="/">
+    <div class="wikistyle">
+END
+
+  if "$UPSKIRT" "$i" >> $outfile; then
     # Hopefully, your browser is smart enough to open new tabs
     $BROWSER $outfile
   fi
@@ -135,4 +148,4 @@ echo "Converted (check your browser)."
 
 # Delayed automatic cleanup
 # WARNING: $PREFIX must not have any spaces
-sh -c "sleep $CLEANUP_TIMEOUT; rm -f $PREFIX*" &
+#sh -c "sleep $CLEANUP_TIMEOUT; rm -f $PREFIX*" &
