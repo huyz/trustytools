@@ -5,10 +5,10 @@ Unixy folder
 ------------
 
 *   markdown - Preview (Github-flavored) Markdown files in a web browser,
-               using http://github.com/'s stylesheet. Useful for checking files,
-               e.g. README.mkd, before pushing to github.
+               using [github.com](http://github.com/)'s stylesheet. Useful for
+               checking files, e.g. `README.mkd`, before pushing to github.
 *   clfu     - Quick-reference for the top 100 commands at
-               http://commandlinefu.com
+               [commandlinefu.com](http://commandlinefu.com)
 *   osxeject - On OS X, eject a removable disk by volume name
 *   ldpath   - Finds location of a dynamic library by traversing the
                search path, for Linux, OS X, and other Unix systems.
