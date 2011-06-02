@@ -1,13 +1,25 @@
 #!/bin/sh
-# markdown - Preview (Github-flavored) Markdown files in a web browser.
-#            Useful to checking files before pushing to github.
+# Filename:         markdown.sh
+# Version:          0.1
+# Description:
+#   Preview (Github-flavored) Markdown files in a web browser. Useful for
+#   checking files, e.g. README.mkd, before pushing to github.
 #
-# Version:          1.0
 # Platforms:        OS X, GNU/Linux (not yet tested), Cygwin (not yet tested)
-# Requires:         upskirt, web browser
+# Depends:          upskirt, web browser
+# Author:           Huy Z, http://huyzing.com/
 # Created on:       2011-06-02
+#
+# Installation:
+# 1. Download https://github.com/tanoku/upskirt, compile, and install in your
+#    PATH
+# 2. Put this script in your PATH, e.g.:
+#    ln -s ~/git/huyz/trustytools/unixy/markdown.sh ~/bin/markdown
+#
+# Usage:
+#    markdown  markdown_file...
 
-# Copyright (C) 2011 Huy Z, http://huyzing.com/
+# Copyright (C) 2011 Huy Z
 # 
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -92,7 +104,7 @@ PREFIX=$TMPDIR/.markdown.$$
 ### Usage
 
 if [ $# -eq 0 ]; then
-  echo "Usage: $execname:file..." >&2
+  echo "Usage: $execname file..." >&2
   exit 1
 fi
 
