@@ -7,6 +7,7 @@
 #
 # Platforms:        Linux, OS X, IRIX, HP-UX
 # Author:           Huy Z, http://huyzing.com/
+# Updated on:       2011-06-03
 # Created on:       1996-05-01
 #
 # Installation:
