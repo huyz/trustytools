@@ -148,4 +148,4 @@ echo "Converted (check your browser)."
 
 # Delayed automatic cleanup
 # WARNING: $PREFIX must not have any spaces
-#sh -c "sleep $CLEANUP_TIMEOUT; rm -f $PREFIX*" &
+sh -c "sleep $CLEANUP_TIMEOUT; rm -f $PREFIX*" &
