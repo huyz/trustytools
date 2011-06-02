@@ -6,3 +6,4 @@ Unixy folder
 
 *   markdown - Preview (Github-flavored) Markdown files in a web browser.
                Useful for checking files before pushing to github.
+*   clfu     - Quick-reference for the top 100 commands at commandlinefu.com
