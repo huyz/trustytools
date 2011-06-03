@@ -4,6 +4,7 @@
 # Description:
 #   Quick-reference for the top 100 commands at commandlinefu.com
 #
+# Source:           https://github.com/huyz/trustytools
 # Author:           Huy Z, http://huyzing.com/
 # Created on:       2010-10-16
 #

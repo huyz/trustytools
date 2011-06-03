@@ -5,6 +5,7 @@
 #   On OS X, eject a removable disk by user-friendly volume name
 #
 # Platforms:        OS X
+# Source:           https://github.com/huyz/trustytools
 # Author:           Huy Z, http://huyzing.com/
 # Created on:       2011-01-23
 #

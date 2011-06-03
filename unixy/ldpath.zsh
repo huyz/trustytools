@@ -6,6 +6,7 @@
 #   search path, for Linux, OS X, and other Unix systems.
 #
 # Platforms:        Linux, OS X, IRIX, HP-UX
+# Source:           https://github.com/huyz/trustytools
 # Author:           Huy Z, http://huyzing.com/
 # Updated on:       2011-06-03
 # Created on:       1996-05-01
