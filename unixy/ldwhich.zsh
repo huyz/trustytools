@@ -1,5 +1,5 @@
 #!/bin/sh
-# Filename:         ldpath.zsh
+# Filename:         ldwhich.zsh
 # Version:          0.1
 # Description:
 #   Finds location of a dynamic library by traversing the dynamic library
@@ -12,15 +12,15 @@
 # Created on:       1996-05-01
 #
 # Installation:
-#   On Irix, this file can be linked to ldpath32, to search the respect
+#   On Irix, this file can be linked to ldwhich32, to search the respect
 #   environment variable.
 #
 # Usage:
-#   ldpath [-a] simple_name ...
+#   ldwhich [-a] simple_name ...
 #     Finds dynamic library in the search path, where simple_name is
 #     for example "c", not "libc.so".
 #     -a will show all matches, not just the first.
-#   ldpath
+#   ldwhich
 #     Prints out the content of the dynamic library search path
 #     environment variable (but not system default directories).
 

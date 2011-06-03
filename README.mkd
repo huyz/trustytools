@@ -15,7 +15,7 @@ Unixy folder
                   that's possibly compressed and/or encrypted.  Files can be
                   filtered at the command-line and/or interactively. Supports
                   compress, gzip, bzip2, xz, gpg, pgp
-*   ldpath      - Finds location of a dynamic library by traversing the
+*   ldwhich     - Finds location of a dynamic library by traversing the
                   search path, for Linux, OS X, and other Unix systems.
 
 Contrib folder
