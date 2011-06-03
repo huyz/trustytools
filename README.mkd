@@ -31,9 +31,12 @@ Contrib folder
                   {From [commandlinefu.com](http://commandlinefu.com)}
 *   wp          - Quickly queries Wikipedia (over DNS!)
                   {From [commandlinefu.com](http://commandlinefu.com)}
-*   timed-read  - Reads a line of input, but times out after the specified
-                  number of seconds
-                  {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}
 *   timed-run   - Run the specified program for a specified maximum number of
                   seconds
                   {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}
+*   timed-read  - Reads a line of input, but times out after the specified
+                  number of seconds
+                  {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}
+*   timed-choice - Prompts user with several choices, but times out with a
+                  default after the specified number of seconds
+                  {By [Eugene Spafford](http://spaf.cerias.purdue.edu/)}

@@ -1,0 +1,51 @@
+#!/bin/sh
+# -*- tcl -*-
+# Provide a read with timeout and default
+
+# From: spaf@cs.purdue.edu (Gene Spafford)
+# Date: Fri, 06 Jan 1995 13:04:49 -0500
+#
+# Usage:
+#   Timeout is the first arg
+#   Query is second
+#   Remaining args are choices
+#   First choice is default
+# Example:
+#    [ $(timed-choice 5 'Logout now?' y n) = y ] && logout
+# Example use is in your .profile to give the user a 
+# choice of window system to run.  E.g.,
+#    WS=`timed-choice 10 MIT-X11 NeWS none`
+
+
+# The next line is executed by /bin/sh, but not tcl \
+exec tclsh "$0" ${1+"$@"}
+
+package require Expect
+
+set timeout [lindex $argv 0]
+set default [lindex $argv 2]
+set rest [lrange $argv 2 end]
+set options [join $rest ","]
+set pattern [join $rest "|"]
+
+set spawn_id $tty_spawn_id
+log_user 0
+
+send "[lindex $argv 1] \[$options] "
+expect {
+   default  {
+       send_user $default
+}
+   -re "^\r?\n$" {
+       send_user $default
+}
+    -re "^($pattern)\r?\n" {
+	send_user $expect_out(1,string)
+   }
+    -re "(.*)\n"	{
+       send "Please enter one of the choices: $options.\n"
+       exp_continue
+    }
+}
+
+send_user "\n"
