@@ -27,9 +27,9 @@ Contrib folder
                   {By [Perl's Larry Wall](http://cpan.perl.org/scripts/file-handling/relink)}
 *   ip2geo      - Given a hostname or IP address, spits out city, state, country
                   {From [commandlinefu.com](http://commandlinefu.com)}
-*   netls       - Lists connections from this host
-                  {From [commandlinefu.com](http://commandlinefu.com)}
 *   wp          - Quickly queries Wikipedia (over DNS!)
+                  {From [commandlinefu.com](http://commandlinefu.com)}
+*   netls       - Lists connections from this host
                   {From [commandlinefu.com](http://commandlinefu.com)}
 *   timed-run   - Run the specified program for a specified maximum number of
                   seconds
@@ -40,3 +40,6 @@ Contrib folder
 *   timed-choice - Prompts user with several choices, but times out with a
                   default after the specified number of seconds
                   {By [Eugene Spafford](http://spaf.cerias.purdue.edu/)}
+*   mailtrim    - Trim a standard Unix mbox file to the most recent specified
+                  number of messages
+                  {By [Michael Soulier](http://identi.ca/msoulier)}
