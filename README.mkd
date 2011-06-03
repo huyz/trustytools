@@ -25,7 +25,7 @@ Contrib folder
 *   relink      - Changes the targets of the specified symlinks using perl's
                   regular expression syntax
                   {By [Perl's Larry Wall](http://cpan.perl.org/scripts/file-handling/relink)}
-*   ip2geo      - Given an IP address, spits out city, state, country
+*   ip2geo      - Given a hostname or IP address, spits out city, state, country
                   {From [commandlinefu.com](http://commandlinefu.com)}
 *   netls       - Lists connections from this host
                   {From [commandlinefu.com](http://commandlinefu.com)}
