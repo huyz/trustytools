@@ -22,6 +22,9 @@ Contrib folder
 *   rename      - Renames the filenames supplied according to the rules
                   specified, including perl's regular expression
                   {By [Aristotle Pagaltzis](http://plasmasturm.org/code/rename/)}
+*   relink      - Changes the targets of the specified symlinks using perl's
+                  regular expression syntax
+                  {By [Perl's Larry Wall](http://cpan.perl.org/scripts/file-handling/relink)}
 *   ip2geo      - Given an IP address, spits out city, state, country
                   {From [commandlinefu.com](http://commandlinefu.com)}
 *   netls       - Lists connections from this host
