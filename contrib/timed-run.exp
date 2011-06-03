@@ -10,6 +10,10 @@ exec tclsh "$0" ${1+"$@"}
 
 package require Expect
 
+# huyz 2011-06-03
+# Disable unneeded output
+log_user 0
+
 set timeout [lindex $argv 0]
 eval spawn [lrange $argv 1 end]
 expect
