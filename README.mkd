@@ -3,14 +3,13 @@ Trusty Tools
 
 Unixy folder
 ------------
-
 *   markhub     - Previews (Github-flavored) Markdown files in a web browser,
                   using [github.com](http://github.com/)'s stylesheet. Useful
                   for checking files, e.g. `README.mkd`, before pushing to
                   github.
-*   clfu        - Quick-reference for the top 100 commands at
+*   clfu        - Displays quick-reference for the top 100 commands at
                   [commandlinefu.com](http://commandlinefu.com)
-*   osxeject    - On OS X, eject a removable disk by user-friendly volume name
+*   osxeject    - On OS X, ejects a removable disk by user-friendly volume name
 *   untar       - Extracts all or specific files from within a tar archive
                   that's possibly compressed and/or encrypted.  Files can be
                   filtered at the command-line and/or interactively. Supports
@@ -22,10 +21,10 @@ Contrib folder
 --------------
 *   rename      - Renames the filenames supplied according to the rules
                   specified, including perl's regular expression
-                  (by [Aristotle Pagaltzis](http://plasmasturm.org/code/rename/))
+                  {By [Aristotle Pagaltzis](http://plasmasturm.org/code/rename/)}
 *   ip2geo      - Given an IP address, spits out city, state, country
-                  (from [commandlinefu.com](http://commandlinefu.com))
+                  {From [commandlinefu.com](http://commandlinefu.com)}
 *   netls       - Lists connections from this host
-                  (from [commandlinefu.com](http://commandlinefu.com))
-*   wp          - Quickly query Wikipedia (over DNS!)
-                  (from [commandlinefu.com](http://commandlinefu.com))
+                  {From [commandlinefu.com](http://commandlinefu.com)}
+*   wp          - Quickly queries Wikipedia (over DNS!)
+                  {From [commandlinefu.com](http://commandlinefu.com)}
