@@ -20,16 +20,17 @@ Unixy folder
 Contrib folder
 --------------
 *   `rename`    - Renames the filenames supplied according to the rules
-                  specified, including perl's regular expression
+                  specified, including by perl regular expression
                   {By [Aristotle Pagaltzis](http://plasmasturm.org/code/rename/)}
-*   `relink`    - Changes the targets of the specified symlinks using perl's
-                  regular expression syntax
+*   `relink`    - Changes the targets of the specified symlinks using perl
+                  regular expression
                   {By [Perl's Larry Wall](http://cpan.perl.org/scripts/file-handling/relink)}
 *   `ip2geo`    - Given a hostname or IP address, spits out city, state, country
                   {From [commandlinefu.com](http://commandlinefu.com)}
 *   `wp`        - Quickly queries Wikipedia (over DNS!)
                   {From [commandlinefu.com](http://commandlinefu.com)}
-*   `netls`     - Lists connections from this host
+*   `netls`     - Graphs the number of connections for each connected remote
+                  host
                   {From [commandlinefu.com](http://commandlinefu.com)}
 *   `timed-run` - Run the specified program for a specified maximum number of
                   seconds
