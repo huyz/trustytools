@@ -1,5 +1,5 @@
 #!/bin/sh
-# Filename:         markdown.sh
+# Filename:         markhub.sh
 # Version:          0.2
 # Description:
 #   Preview (Github-flavored) Markdown files in a web browser. using github's
@@ -19,7 +19,7 @@
 #    ln -s ~/git/huyz/trustytools/unixy/markdown.sh ~/bin/markdown
 #
 # Usage:
-#    markdown markdown_file ...
+#    markhub markdown_file ...
 
 # Copyright (C) 2011 Huy Z
 # 

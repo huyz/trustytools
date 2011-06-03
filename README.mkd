@@ -4,7 +4,7 @@ Trusty Tools
 Unixy folder
 ------------
 
-*   markdown    - Previews (Github-flavored) Markdown files in a web browser,
+*   markhub     - Previews (Github-flavored) Markdown files in a web browser,
                   using [github.com](http://github.com/)'s stylesheet. Useful
                   for checking files, e.g. `README.mkd`, before pushing to
                   github.
