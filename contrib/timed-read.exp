@@ -1,0 +1,15 @@
+#!/bin/sh
+# -*- tcl -*-
+# Read a complete line from stdin
+# aborting after the number of seconds (given as an argument)
+# - Don Libes
+# 2011-06-03
+# Source: http://sourceforge.net/projects/expect
+
+# The next line is executed by /bin/sh, but not tcl \
+exec tclsh "$0" ${1+"$@"}
+
+package require Expect
+
+set timeout $argv
+expect -re \n {send_user $expect_out(buffer)}

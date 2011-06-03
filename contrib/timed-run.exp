@@ -1,0 +1,15 @@
+#!/bin/sh
+# -*- tcl -*-
+# Run a program for a given amount of time
+#   e.g. time 20 long_running_program
+# 2011-06-03
+# Source: http://sourceforge.net/projects/expect
+
+# The next line is executed by /bin/sh, but not tcl \
+exec tclsh "$0" ${1+"$@"}
+
+package require Expect
+
+set timeout [lindex $argv 0]
+eval spawn [lrange $argv 1 end]
+expect
