@@ -37,7 +37,7 @@ Contrib folder
 *   `timed-read` - Reads a line of input, but times out after the specified
                   number of seconds
                   {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}
-*   `timed-choice - Prompts user with several choices, but times out with a
+*   `timed-choice` - Prompts user with several choices, but times out with a
                   default after the specified number of seconds
                   {By [Eugene Spafford](http://spaf.cerias.purdue.edu/)}
 *   `mailtrim`  - Trim a standard Unix mbox file to the most recent specified
