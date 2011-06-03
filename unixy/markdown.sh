@@ -9,7 +9,7 @@
 # Platforms:        OS X, GNU/Linux (not yet tested), Cygwin (not yet tested)
 # Depends:          upskirt, web browser
 # Source:           https://github.com/huyz/trustytools
-# Author:           Huy Z, http://huyzing.com/
+# Author:           Huy Z, http://huyz.us/
 # Created on:       2011-06-02
 #
 # Installation:

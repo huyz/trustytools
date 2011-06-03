@@ -8,7 +8,7 @@
 #   Supports compress, gzip, bzip2, xz, gpg, pgp
 #
 # Source:           https://github.com/huyz/trustytools
-# Author:           Huy Z, http://huyzing.com/
+# Author:           Huy Z, http://huyz.us/
 # Updated on:       2011-06-03
 # Created on:       1995-08-10
 #

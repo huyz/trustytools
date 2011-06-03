@@ -6,7 +6,7 @@
 #
 # Platforms:        OS X
 # Source:           https://github.com/huyz/trustytools
-# Author:           Huy Z, http://huyzing.com/
+# Author:           Huy Z, http://huyz.us/
 # Created on:       2011-01-23
 #
 # Usage:

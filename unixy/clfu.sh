@@ -5,7 +5,7 @@
 #   Quick-reference for the top 100 commands at commandlinefu.com
 #
 # Source:           https://github.com/huyz/trustytools
-# Author:           Huy Z, http://huyzing.com/
+# Author:           Huy Z, http://huyz.us/
 # Created on:       2010-10-16
 #
 # Usage:            just run it
