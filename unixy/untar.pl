@@ -49,20 +49,22 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use v5.6.0;
-
 ### Modules & pragmas
 
-our $DEBUG;
-
-use warnings;
+require 5.006_000;
 use strict;
+use warnings;
+
+use vars qw($VERSION);
+$VERSION = '0.1';
 
 use Getopt::Long 2.19;
 use vars qw( $opt_interactive $opt_substring $opt_quiet );
 
 #############################################################################
 ##### Configuration
+
+our $DEBUG;
 
 # NOTE: see under "Build command" section for all program paths.
 
