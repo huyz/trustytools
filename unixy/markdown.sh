@@ -82,7 +82,7 @@ if [ -z $BROWSER ]; then
     cygwin)  BROWSER=cygstart ;;
     *) 
       BROWSER=
-      for i in xdg-open gnome-open chromium-browser chrome firefox opera; do
+      for i in xdg-open gnome-open chromium-browser chrome firefox opera elinks links w3m lynx; do
         hash $i >& /dev/null && BROWSER=$i && break
       done
       if [ -z "$BROWSER" ]; then
