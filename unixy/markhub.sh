@@ -71,7 +71,7 @@ case "$UPSKIRT" in
 esac
 if [ -n "$notfound" ]; then
   echo "$execname: ERROR: 'upskirt' not found." >&2
-  echo "$execname:        Download from 'https://github.com/tanoku/upskirt'," >&2
+  echo "$execname:        Download from https://github.com/tanoku/upskirt ," >&2
   echo "$execname:        compile, and install in your PATH." >&2
   exit 1
 fi
