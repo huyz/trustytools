@@ -20,6 +20,12 @@ Unixy folder
 
 Contrib folder
 --------------
+*   rename      - Renames the filenames supplied according to the rules
+                  specified, including perl's regular expression
+                  (by [Aristotle Pagaltzis](http://plasmasturm.org/code/rename/))
 *   ip2geo      - Given an IP address, spits out city, state, country
+                  (from [commandlinefu.com](http://commandlinefu.com))
 *   netls       - Lists connections from this host
+                  (from [commandlinefu.com](http://commandlinefu.com))
 *   wp          - Quickly query Wikipedia (over DNS!)
+                  (from [commandlinefu.com](http://commandlinefu.com))
