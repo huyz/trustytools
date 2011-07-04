@@ -54,7 +54,7 @@ UPSKIRT=upskirt
 
 # Timeout in secs before automatic cleanup of temporary HTML files.
 # Increase if your browser takes a long time to launch and display
-CLEANUP_TIMEOUT=10
+CLEANUP_TIMEOUT=30
 
 ##### End of Configuration
 #############################################################################
