@@ -7,16 +7,16 @@
 #   github.
 #
 # Platforms:        OS X, GNU/Linux (not yet tested), Cygwin (not yet tested)
-# Depends:          upskirt, web browser
+# Depends:          sundown, web browser
 # Source:           https://github.com/huyz/trustytools
 # Author:           Huy Z, http://huyz.us/
 # Created on:       2011-06-02
 #
 # Installation:
-# 1. Download https://github.com/tanoku/upskirt, compile, and install in your
+# 1. Download https://github.com/vmg/sundown.git, compile, and install in your
 #    PATH
 # 2. Put this script in your PATH, e.g.:
-#    ln -s ~/git/huyz/trustytools/unixy/markdown.sh ~/bin/markdown
+#    ln -s ~/git/huyz/trustytools/unixy/markhub.sh ~/bin/markhub
 #
 # Usage:
 #    markhub markdown_file ...
@@ -49,8 +49,8 @@
 # but you can override here.  You can use basename or full path.
 #BROWSER=
 
-# Name of upskirt executable.  You can use basename or full path.
-UPSKIRT=upskirt
+# Name of sundown executable.  You can use basename or full path.
+SUNDOWN=sundown
 
 # Timeout in secs before automatic cleanup of temporary HTML files.
 # Increase if your browser takes a long time to launch and display
@@ -63,15 +63,15 @@ CLEANUP_TIMEOUT=30
 
 execname=`basename $0`
 
-# Check for upskirt
+# Check for sundown
 notfound=
-case "$UPSKIRT" in
-  /*) [ -x "$UPSKIRT" ] || notfound=1 ;;
-  *)  hash "$UPSKIRT" >&/dev/null || notfound=1 ;;
+case "$SUNDOWN" in
+  /*) [ -x "$SUNDOWN" ] || notfound=1 ;;
+  *)  hash "$SUNDOWN" >&/dev/null || notfound=1 ;;
 esac
 if [ -n "$notfound" ]; then
-  echo "$execname: ERROR: 'upskirt' not found." >&2
-  echo "$execname:        Download from https://github.com/tanoku/upskirt ," >&2
+  echo "$execname: ERROR: 'sundown' not found." >&2
+  echo "$execname:        Download from https://github.com/vmg/sundown ," >&2
   echo "$execname:        compile, and install in your PATH." >&2
   exit 1
 fi
@@ -114,20 +114,34 @@ fi
 
 num=0
 for i in "$@"; do
+  # Get the stylesheet from github
+  # 2012-09-24 For some reason I can't just reference it
+  wget --quiet -O ${PREFIX}.documentation.css https://raw.github.com/github/github-flavored-markdown/gh-pages/shared/css/documentation.css
+  wget --quiet -O ${PREFIX}.screen.css https://raw.github.com/github/github-flavored-markdown/gh-pages/stylesheets/screen.css
+
   outfile=${PREFIX}.$num.html
+
   cat <<END >$outfile
 <!DOCTYPE html>
   <html>
     <head> 
       <meta charset='utf-8'> 
-      <link href="https://d3nwyuy0nl342s.cloudfront.net/b5d0a8471557d0f44f5fcdbb6e11712779be039d/stylesheets/bundle_github.css" media="screen" rel="stylesheet" type="text/css" /> 
+      <link href="$(basename ${PREFIX}.documentation.css)" media="screen" rel="stylesheet" type="text/css">
+      <link href="$(basename ${PREFIX}.screen.css)" media="screen" rel="stylesheet" type="text/css">
+
+      <style>
+        /* From inspecting element on github.com */
+        #readme .markdown-body, #readme .plain {
+          padding: 30px;
+        }
+      </style>
     </head>
 <body>
   <div id="readme" class="announce instapaper_body md" data-path="/">
-    <div class="wikistyle">
+    <article class="markdown-body entry-content" itemprop="mainContentOfpage">
 END
 
-  if "$UPSKIRT" "$i" >> $outfile; then
+  if "$SUNDOWN" "$i" >> $outfile; then
     # Hopefully, your browser is smart enough to open new tabs
     $BROWSER $outfile
   fi
