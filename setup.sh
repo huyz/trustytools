@@ -11,7 +11,16 @@ GIT=$PWD
 [ -d ~/bin ] || mkdir ~/bin
 cd ~/bin
 
-for i in $GIT/*.*; do
+for i in $GIT/*/*.*; do
+  # Install mac scripts only on mac
+  case "$i" in
+    */mac/*)
+      case "$OSTYPE" in
+        darwin*) ;;
+        *) continue ;;
+      esac
+  esac
+
   target=$(basename "${i%%.*}")
   if [ -x "$i" -a ! -e "$target" ]; then
     echo ln -s "$i" "$target"

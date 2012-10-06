@@ -1,0 +1,25 @@
+#!/usr/bin/osascript
+# huy 2012-10-06
+# Makes iTerm open a new tab at the specified directory.
+# Usage examples:
+# - Set IntelliJ external tool to launch a new terminal shell in $FileDir$
+
+on run argv
+  # Get the first argument passed in as target directory
+  set dir to quoted form of (first item of argv)
+
+  tell application "iTerm"
+    activate
+
+    # Assume that there is already a terminal
+    #set myterm to (make new terminal)
+    set myterm to last terminal
+
+    tell myterm
+      launch session "Default"
+      tell the last session
+        write text "cd " & dir
+      end tell
+    end tell
+  end tell
+end run

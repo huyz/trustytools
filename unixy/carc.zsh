@@ -1,6 +1,6 @@
 #!/bin/sh
 # $RCSfile: carc,v $ $Revision: 1.18 $ $Date: 2012/09/25 20:58:17 $
-# Archives the given files into a gzip'd tar file, optionally encrypted.
+# Archives the given files into a bzip2'd tar file, optionally gpg-encrypted.
 
 # We actually want zsh
 [ "x$ZSH_VERSION" = "x" ] && exec zsh -f "$0" "$@"
@@ -16,13 +16,13 @@ usage()
 {
   echo "Usage: $0 [options] archive_prefix file...
   Options:
-    -e : encrypt using gpg 3DES
+    -e : encrypt using gpg
     -q : run quietly"
   exit 1
 }
 while getopts "eq" opt; do
   case $opt in
-    e) [[ -n $opt_encrypt ]] && opt_encrypt= || opt_encrypt=.3des ;;
+    e) [[ -n $opt_encrypt ]] && opt_encrypt= || opt_encrypt=.gpg ;;
     q) [[ -n $opt_verbose ]] && opt_verbose= || opt_verbose=v ;;
     \?) usage ;;
   esac
@@ -47,7 +47,9 @@ if [[ -n $opt_encrypt ]]; then
   tar -cf - "${(@)argv[2,-1]}" |
 #    gzip -c |
     bzip2 -c |
-    gpg -c --cipher-algo 3DES -o "$1.tbz.3des"
+# 2012-10-06 Switching to asymmetric encryption
+#    gpg -c --cipher-algo 3DES -o "$1.tbz.3des"
+    gpg -e --default-recipient-self -o "$1.tbz.gpg"
 # Don't encrypt
 else
   tar -c${opt_verbose}jf "$1.tbz" "${(@)argv[2,-1]}"

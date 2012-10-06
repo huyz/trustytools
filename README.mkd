@@ -10,19 +10,30 @@ Unixy folder
 ------------
 These tools were initially created by me.
 
+*   `carc`      - Simply and safely archive files with optional gpg encryption
+*   `clfu`      - Displays quick-reference for the top 100 commands at
+                  [commandlinefu.com](http://commandlinefu.com)
+*   `decrypt`   - Simply decrypts all sorts of gpg-encrypted files
+*   `encrypt`   - Simply encrypts files with gpg
+*   `ldwhich`   - Finds location of a dynamic library by traversing the
+                  search path, for Linux, OS X, and other Unix systems.
+*   `list`      - Simply shows/lists files with the right pager(s) depending
+                  on filename extension(s)
 *   `markhub`   - Previews (Github-flavored) Markdown files in a web browser,
                   using [github.com](http://github.com/)'s stylesheet. Useful
                   for checking files, e.g. `README.mkd`, before pushing to
                   github.
-*   `clfu`      - Displays quick-reference for the top 100 commands at
-                  [commandlinefu.com](http://commandlinefu.com)
-*   `osxeject`  - On OS X, ejects a removable disk by user-friendly volume name
 *   `untar`     - Extracts all or specific files from within a tar archive
                   that's possibly compressed and/or encrypted.  Files can be
                   filtered at the command-line and/or interactively. Supports
                   compress, gzip, bzip2, xz, gpg, pgp
-*   `ldwhich`   - Finds location of a dynamic library by traversing the
-                  search path, for Linux, OS X, and other Unix systems.
+
+Mac folder
+----------
+
+*   `iterm-new-tab` - On OS X, starts a new tab in iTerm2 in the specified
+                 directory
+*   `maceject`  - On OS X, ejects a removable disk by user-friendly volume name
 
 Contrib folder
 --------------
