@@ -41,11 +41,9 @@ These open-source tools were found here and there and aggregated because
 they're quite useful but not easily available.
 
 *   `rename`    - Renames the filenames supplied according to the rules
-                  specified, including by perl regular expression
+                  specified, including by perl regular expression.
+                  Handles symlinks.  Customized to do "git mv"
                   {By [Aristotle Pagaltzis](http://plasmasturm.org/code/rename/)}
-*   `relink`    - Changes the targets of the specified symlinks using perl
-                  regular expression
-                  {By [Perl's Larry Wall](http://cpan.perl.org/scripts/file-handling/relink)}
 *   `ip2geo`    - Given a hostname or IP address, spits out city, state, country
                   {From [commandlinefu.com](http://commandlinefu.com)}
 *   `wp`        - Quickly queries Wikipedia (over DNS!)

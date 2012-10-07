@@ -179,6 +179,11 @@ use constant VERB_FOR => {
 		pastp => 'renamed',
 		exec  => sub { rename shift, shift or die },
 	},
+        'git-mv' => {
+		inf   => 'git-rename',
+		pastp => 'git-renamed',
+		exec  => sub { system 'git mv ' . shift . ' ' . shift and die },
+        }
 };
 
 sub argv_to_subst_expr {
@@ -203,6 +208,7 @@ GetOptions(
 	'e|expr=s'                  => \@EXPR,
 	'f|force'                   => \my $opt_force,
 	'g|glob'                    => \my $opt_glob,
+        'git'                       => \my $opt_git,
 	'i|interactive'             => \my $opt_interactive,
 	'k|backwards|reverse-order' => \my $opt_backwards,
 	'l|symlink'                 => \my $opt_symlink,
@@ -224,6 +230,8 @@ if(not @EXPR) {
 
 pod2usage( -verbose => 1 )
 	if ($opt_hardlink and $opt_symlink)
+        or ($opt_hardlink and $opt_git)
+        or ($opt_git and $opt_symlink)
 	or ($opt_null and @ARGV);
 
 ++$opt_verbose if $opt_dryrun;
@@ -254,6 +262,7 @@ my $code = do {
 my $verb = VERB_FOR->{
 	$opt_hardlink ? 'link' :
 	$opt_symlink  ? 'symlink' :
+	$opt_git  ? 'git-mv' :
 	do { 'rename' }
 };
 
