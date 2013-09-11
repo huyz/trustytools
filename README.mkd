@@ -23,6 +23,8 @@ These tools were initially created by me.
                   using [github.com](http://github.com/)'s stylesheet. Useful
                   for checking files, e.g. `README.mkd`, before pushing to
                   github.
+*   `unln`      - Replaces a symlinked file with a copy so that it can be
+                  edited separately
 *   `untar`     - Extracts all or specific files from within a tar archive
                   that's possibly compressed and/or encrypted.  Files can be
                   filtered at the command-line and/or interactively. Supports
