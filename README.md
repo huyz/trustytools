@@ -33,9 +33,7 @@ These tools were initially created by me.
 Mac folder
 ----------
 
-*   `iterm-new-tab` - On OS X, starts a new tab in iTerm2 in the specified
-                 directory
-*   `maceject`  - On OS X, ejects a removable disk by user-friendly volume name
+*   `eject`     - On OS X, ejects a removable disk by user-friendly volume name
 
 Contrib folder
 --------------
