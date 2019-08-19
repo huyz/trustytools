@@ -1,5 +1,5 @@
 #!/bin/sh
-# Creates symlinks from Applications' UUID-named folders to human-friendly app names
+# 2014-11-20 Useful for deleting iTunesMetadata.plist to prevent App Store updates
 
 DESTDIR=/private/var/mobile/AppLinks
 
@@ -9,9 +9,13 @@ else
   mkdir "$DESTDIR" || exit 1
 fi
 
-# For iOS8
 for i in /private/var/mobile/Containers/Bundle/Application/*/*.app; do
   base="$(basename "$i")"
   target="$DESTDIR/$base"
-  ln -s "$(dirname "$i")" "$target"
+  if [ -e "$target" ]; then
+    echo "Error: $target already exists" >&2
+  else
+    echo "$target"
+    ln -s "$(dirname "$i")" "$target"
+  fi
 done
