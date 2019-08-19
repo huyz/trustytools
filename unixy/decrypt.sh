@@ -26,7 +26,7 @@ for i in "$@"; do
       echo "$passphrase" | gpg --passphrase-fd 0 --batch -q -d -o "$out" "$i" && touch -r "$i" "$out"
       ;;
     *)
-      echo "WARNING: skipping $i; must be named *.3des" >&2
+      echo "WARNING: skipping $i; must be named *.3des or #*.gpg" >&2
       ;;
   esac
 done
