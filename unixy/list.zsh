@@ -104,8 +104,8 @@ for i in "$@"; do
     esac
 
     if [[ -n "$command" ]]; then
-      [[ -n $DEBUG ]] && echo "Command=LESS=$_LESS $command less $_lessargs"
-      eval "LESS=$_LESS $command less $_lessargs"
+      [[ -n $DEBUG ]] && echo "Command=LESS=\"$_LESS\" $command less $_lessargs"
+      eval "LESS=\"$_LESS\" $command less $_lessargs"
       continue
     fi
 
@@ -205,8 +205,8 @@ for i in "$@"; do
       filename="${${filename%.*}%,v}"
     done
 
-    [[ -n $DEBUG ]] && echo "Command=LESS=$_LESS $command less $_lessargs"
-    eval "LESS=$_LESS $command less $_lessargs"
+    [[ -n $DEBUG ]] && echo "Command=LESS=\"$_LESS\" $command less $_lessargs"
+    eval "LESS=\"$_LESS\" $command less $_lessargs"
   fi
 done
 
