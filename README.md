@@ -23,6 +23,8 @@ These tools were initially created by me.
                   using [github.com](http://github.com/)'s stylesheet. Useful
                   for checking files, e.g. `README.mkd`, before pushing to
                   github.
+*   `unln`      - Replaces a symlinked file with a copy so that it can be
+                  edited separately
 *   `untar`     - Extracts all or specific files from within a tar archive
                   that's possibly compressed and/or encrypted.  Files can be
                   filtered at the command-line and/or interactively. Supports
@@ -31,9 +33,12 @@ These tools were initially created by me.
 Mac folder
 ----------
 
-*   `iterm-new-tab` - On OS X, starts a new tab in iTerm2 in the specified
-                 directory
-*   `maceject`  - On OS X, ejects a removable disk by user-friendly volume name
+| Command                        | Description                                          |
+| ---                            | ---                                                  |
+| `autoclear-clipboard`          | Automatically clears passwords from clipboard after a brief time (because Universal Clipboard is dangerous) |
+| `bundle-id`                    | Displays the bundle ID of specific application (useful for `terminal-notifier`) |
+| `eject`                        | Ejects a removable disk by user-friendly volume name |
+| `show-dev-sig-of-running-apps` | Displays Dev Signatures of running apps              |
 
 Contrib folder
 --------------
@@ -79,12 +84,12 @@ without limitation the rights to use, copy, modify, merge, publish,
 distribute, sublicense, and/or sell copies of the Software, and to
 permit persons to whom the Software is furnished to do so, subject to
 the following conditions:
-                  
+
 The above copyright notice and this permission notice shall be
 included in all copies or substantial portions of the Software.
-                  
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
 NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION

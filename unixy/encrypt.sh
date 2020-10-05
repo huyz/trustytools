@@ -22,7 +22,12 @@ for i in "$@"; do
       [ $# -gt 0 ] && echo "=== $i"
       # 2011-05-18 Switching to asymmetric encryption
       #gpg -c --cipher-algo 3DES -o "$i.3des" "$i"
-      gpg -e --default-recipient-self "$i" && touch -r "$i" "$i.gpg"
+      if gpg -e --default-recipient-self "$i"; then
+        touch -r "$i" "$i.gpg" || echo "$0: touch failed with $?" >&2
+        exit 0
+      else
+        exit $?
+      fi
       ;;
   esac
 done
