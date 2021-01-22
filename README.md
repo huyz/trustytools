@@ -45,10 +45,6 @@ Contrib folder
 These open-source tools were found here and there and aggregated because
 they're quite useful but not easily available.
 
-*   `rename`    - Renames the filenames supplied according to the rules
-                  specified, including by perl regular expression.
-                  Customized to do "git mv"
-                  {By [Aristotle Pagaltzis](http://plasmasturm.org/code/rename/)}
 *   `relink`    - Relinks symbolic links by perl regular expression on the paths
                   of the links' targets.
 *   `ip2geo`    - Given a hostname or IP address, spits out city, state, country
