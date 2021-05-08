@@ -5,7 +5,7 @@
 disks=$(diskutil list external | sed -n '/[Ss]cheme/s/.*B *//p')
 
 if [ "$disks" ]; then
-    echo "$disks" | while read line ; do
+    echo "$disks" | while read -r line ; do
         diskutil unmountDisk "/dev/$line"
     done
 else
