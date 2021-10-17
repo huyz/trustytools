@@ -59,7 +59,8 @@ if curl -sH"Authorization: Bearer $GCLOUD_TOKEN" \
    jq -r '.responses[0].fullTextAnnotation.text' |
    pbcopy
 then
-  osascript -e 'display notification "Extracted text to clipboard"'
+  osascript -e 'display notification "Successfully extracted to clipboard" with title "screencap-ocr" sound name "Blow"'
+  osascript -e 'display dialog (the clipboard) with title "screencap-ocr" buttons {"OK"} default button 1'
 else
-  osascript -e 'display notification "Failed to extract to clipboard"'
+  osascript -e 'display notification "Failed to extract to clipboard" with title "screencap-ocr" sound name "Basso"'
 fi
