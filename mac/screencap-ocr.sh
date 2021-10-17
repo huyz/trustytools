@@ -8,7 +8,9 @@
 #   granted beforehand (to Terminal.app and/or iTerm2):
 #   https://apple.stackexchange.com/questions/374158/why-is-screencapture-taking-the-screenshot-of-the-desktop-image-and-not-the-wind/384417#384417
 # - Google Cloud Vision API must be enabled in the Google Cloud Console, and a
-#   service key must be generated.
+#   service key must be generated. You will have to create a Billing Account with
+#   a credit card, but you get 1000 units per month for free
+#   https://cloud.google.com/vision/pricing
 # - Save the service credentials JSON file somewhere and `export
 #   GOOGLE_APPLICATION_CREDENTIALS=<path>` in your shell login scripts.
 # - `brew install google-cloud-sdk` for the `gcloud auth` command
