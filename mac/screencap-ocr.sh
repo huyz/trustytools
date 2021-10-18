@@ -1,7 +1,7 @@
 #!/bin/bash
 # - Extracts text from screencap on macOS via Google Cloud Vision API's Text Detection
 #   https://apple.stackexchange.com/questions/244557/screenshot-to-ocr-on-os-x/354036#354036
-# - Works great when binding to shift-command-2, e.g. with BetterTouchTool or QuickSilver.
+# - Works great when binding to shift-command-6, e.g. with BetterTouchTool or QuickSilver.
 #
 # Prerequisites:
 # - If invoking from command line, starting with Catalina, permissions must be
