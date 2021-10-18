@@ -18,6 +18,25 @@
 set -euo pipefail
 shopt -s failglob
 
+#
+# Check Prerequisites
+#
+
+if ! command -v gcloud >& /dev/null; then
+    echo "$0: error: gcloud could not be found. Try \`brew install gcloud-sdk\`" >&2
+    exit 1
+fi
+if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+    echo "$0: error: GOOGLE_APPLICATION_CREDENTIALS envvar is not set" >&2
+    exit 1
+fi
+
+GCLOUD_TOKEN="$(gcloud auth application-default print-access-token)"
+
+#
+# Init
+#
+
 # Create temporary file
 # NOTE: macOS mktemp requires XXXXXXXX to be at the end
 screenshot="$(mktemp "${TMP:-/tmp}/$(basename "$0").png.XXXXXXX")"
@@ -26,13 +45,15 @@ cleanup() {
 }
 trap cleanup HUP INT QUIT TERM EXIT
 
+#
+# Main
+#
+
 # Take screenshot interactively
 screencapture -i "$screenshot"
 [[ ! -e "$screenshot" || ! -s "$screenshot" ]] && exit
 # echo "Temporary file: $screenshot" >&2
 # open "$screenshot"
-
-GCLOUD_TOKEN="$(gcloud auth application-default print-access-token)"
 
 # TIP: to give hints about languages:
 # "imageContext": {
