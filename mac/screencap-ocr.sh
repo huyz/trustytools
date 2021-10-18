@@ -23,7 +23,7 @@ shopt -s failglob
 #
 
 if ! command -v gcloud >& /dev/null; then
-    echo "$0: error: gcloud could not be found. Try \`brew install gcloud-sdk\`" >&2
+    echo "$0: error: gcloud could not be found. Try \`brew install google-cloud-sdk\`" >&2
     exit 1
 fi
 if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
