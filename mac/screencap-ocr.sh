@@ -32,6 +32,11 @@ if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
 fi
 
 GCLOUD_TOKEN="$(gcloud auth application-default print-access-token)"
+if [[ -z "${GCLOUD_TOKEN:-}" ]]; then
+    echo "$0: error: could not get gcloud auth token. Did you set the GOOGLE_APPLICATION_CREDENTIALS envvar?" >&2
+    exit 1
+    echo 
+fi
 
 #
 # Init
