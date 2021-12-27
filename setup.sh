@@ -5,12 +5,13 @@
 
 case "$OSTYPE" in
     darwin*)
-        READLINK=/usr/local/bin/greadlink
+        BREW="$(brew --prefix)"
+        READLINK="$BREW/bin/greadlink"
         if [[ ! -x $READLINK ]]; then
             echo "$0: error: $READLINK could not be found. Run \`brew install coreutils\`" >&2
             exit 1
         fi
-        GETOPT=/usr/local/opt/gnu-getopt/bin/getopt
+        GETOPT="$BREW/opt/gnu-getopt/bin/getopt"
         if [[ ! -x $GETOPT ]]; then
             echo "$0: error: $GETOPT could not be found. Run \`brew install gnu-getopt\`" >&2
             exit 1
