@@ -19,14 +19,14 @@ CLEAR_PASSWORD_ONLY=1
 prev_content=
 
 while true; do
-  content=`pbpaste`
+  content="$(pbpaste)"
 
   if [[ -z "$content" ]]; then
     [[ -n $DEBUG ]] && echo "Nothing. Skipping..." >&2
     :
 
   elif [[ "$content" = "$prev_content" ]]; then
-    if (( $SECONDS - $prev_seconds >= $CHECK_INTERVAL )); then
+    if (( SECONDS - prev_seconds >= CHECK_INTERVAL )); then
       [[ -n $DEBUG ]] && echo "Stale. Erasing..." >&2
       pbcopy </dev/null
       prev_content=
