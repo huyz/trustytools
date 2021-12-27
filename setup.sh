@@ -5,7 +5,7 @@
 
 case "$OSTYPE" in
     darwin*)
-        BREW="$(brew --prefix)"
+        BREW="$(brew --prefix 2>/dev/null || /opt/homebrew/bin/brew --prefix)"
         READLINK="$BREW/bin/greadlink"
         if [[ ! -x $READLINK ]]; then
             echo "$0: error: $READLINK could not be found. Run \`brew install coreutils\`" >&2
