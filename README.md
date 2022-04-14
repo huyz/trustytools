@@ -13,6 +13,7 @@ These tools were initially created by me.
 *   `carc`      - Simply and safely archive files with optional gpg encryption
 *   `clfu`      - Displays quick-reference for the top 100 commands at
                   [commandlinefu.com](http://commandlinefu.com)
+*   `cmpdir`    - Wrapper for rsync to compare two directory trees by checksum
 *   `decrypt`   - Simply decrypts all sorts of gpg-encrypted files
 *   `encrypt`   - Simply encrypts files with gpg
 *   `ldwhich`   - Finds location of a dynamic library by traversing the
