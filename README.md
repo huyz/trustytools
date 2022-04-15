@@ -10,7 +10,7 @@ Unixy folder
 ------------
 These tools were initially created by me.
 
-*   `carc`      - Simply and safely archive files with optional gpg encryption
+*   `carc`      - Simply and safely archive files with optional gpg encryption *   `cdiff`     - Wrapper for diff to add colors both at the line and word level
 *   `clfu`      - Displays quick-reference for the top 100 commands at
                   [commandlinefu.com](http://commandlinefu.com)
 *   `cmpdir`    - Wrapper for rsync to compare two directory trees by checksum
