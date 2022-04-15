@@ -31,7 +31,7 @@ case "$OSTYPE" in
         fi
         ;;
     *)
-        DIFFH=/usr/share/doc/git/contrib/diff-highlight
+        DIFFH=/usr/share/doc/git/contrib/diff-highlight/diff-highlight
         if [[ -z "$DIFFH" ]]; then
             echo "$0: error: diff-highlight could not be found. run \`sudo apt install git\`" >&2
             exit 1
