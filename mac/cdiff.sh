@@ -15,7 +15,7 @@ if ! command -v colordiff >& /dev/null; then
             echo "$0: error: colordiff could not be found. Run \`brew install colordiff\`" >&2
             ;;
         *)
-            echo "$0: error: colordiff could not be found. Run \`apt install colordiff\`" >&2
+            echo "$0: error: colordiff could not be found. Run \`sudo apt install colordiff\`" >&2
             ;;
     esac
     exit 1
@@ -33,7 +33,7 @@ case "$OSTYPE" in
     *)
         DIFFH=/usr/share/doc/git/contrib/diff-highlight
         if [[ -z "$DIFFH" ]]; then
-            echo "$0: error: diff-highlight could not be found. Run \`apt install git\`" >&2
+            echo "$0: error: diff-highlight could not be found. run \`sudo apt install git\`" >&2
             exit 1
         fi
         ;;
