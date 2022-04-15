@@ -24,18 +24,20 @@ fi
 case "$OSTYPE" in
     darwin*)
         BREW="$(brew --prefix)"
-        DIFFH="$BREW/share/git-core/contrib/diff-highlight/diff-highlight"
-        if [[ -z "$DIFFH" ]]; then
+        diffh="$BREW/share/git-core/contrib/diff-highlight/diff-highlight"
+        if [[ -z "$diffh" ]]; then
             echo "$0: error: diff-highlight could not be found. Run \`brew install git\`" >&2
             exit 1
         fi
+        DIFFH=("$diffh")
         ;;
     *)
-        DIFFH=/usr/share/doc/git/contrib/diff-highlight/diff-highlight
-        if [[ -z "$DIFFH" ]]; then
+        diffh=/usr/share/doc/git/contrib/diff-highlight/diff-highlight
+        if [[ -z "$diffh" ]]; then
             echo "$0: error: diff-highlight could not be found. run \`sudo apt install git\`" >&2
             exit 1
         fi
+        DIFFH=(perl "$diffh")
         ;;
 esac
 
@@ -44,4 +46,4 @@ if [[ $# -ne 2 ]]; then
     exit 1
 fi
 
-colordiff -u "$1" "$2" | "$DIFFH"
+colordiff -u "$1" "$2" | "${DIFFH[@]}"
