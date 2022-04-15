@@ -56,7 +56,7 @@
 
 set -euo pipefail
 shopt -s failglob
-
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
 
 ### Check arguments
 
