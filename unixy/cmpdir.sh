@@ -1,6 +1,9 @@
 #!/bin/bash
+# Compares two directory trees using rsync. By default only does comparisons of filesizes and timestamps,
+# but you can add `-c` to compare checksums
+# Usage: cmpdir [-c] source_dir target_dir
 #
-# [ubuntu - Verifying a large directory after copy from one hard drive to another - Unix & Linux Stack Exchange](https://unix.stackexchange.com/a/313189/7281):
+# Based on [ubuntu - Verifying a large directory after copy from one hard drive to another - Unix & Linux Stack Exchange](https://unix.stackexchange.com/a/313189/7281):
 #
 # ```shell
 # rsync -nac --itemize-changes --hard-links --delete --info=progress2 /SOURCE/FOLDER/ /TARGET/FOLDER 2>&1 | tee /tmp/rsync.FOLDER.log
@@ -57,8 +60,15 @@ shopt -s failglob
 
 ### Check arguments
 
+opt_checksum=
+if [[ "${1:-}" == -c ]]; then
+  opt_checksum="$1"
+  shift
+fi
+
 if [[ $# != 2 ]]; then
-  echo "Usage: $0 source_dir target_dir" >&2
+  echo "Usage: $0 [-c] source_dir target_dir" >&2
+  echo "       -c compare checksums (instead of just filesize and timestamp)" >&2
   exit 1
 fi
 src="$1"
@@ -138,4 +148,6 @@ exec &> >(tee "$tmpfile")
 
 ### Execute
 
-exec rsync -nac --itemize-changes --hard-links --delete --info=progress2 "$src" "$tar"
+echo rsync -na ${opt_checksum:+"$opt_checksum"} --itemize-changes --hard-links --delete --info=progress2 "$src" "$tar"
+echo
+exec rsync -na ${opt_checksum:+"$opt_checksum"} --itemize-changes --hard-links --delete --info=progress2 "$src" "$tar"
