@@ -6,14 +6,16 @@
 # Based on [ubuntu - Verifying a large directory after copy from one hard drive to another - Unix & Linux Stack Exchange](https://unix.stackexchange.com/a/313189/7281):
 #
 # ```shell
-# rsync -nac --itemize-changes --hard-links --delete --info=progress2 /SOURCE/FOLDER/ /TARGET/FOLDER 2>&1 | tee /tmp/rsync.FOLDER.log
+# rsync -ni -aH -c --delete --info=progress2 /SOURCE/FOLDER/ /TARGET/FOLDER 2>&1 | tee /tmp/rsync.FOLDER.log
 # ```
 # 
 # 
 # Be careful to end the first folder name (the source) with a `/`. The options are
 # 
 # -   `-n` dry-run (make no changes)
+# -   `-i` itemize changes
 # -   `-a` archive mode: preserve (i.e. compare since we have `-n`) permissions, ownerships, symbolic links, etc. and recurse down directories
+# -   `-H` preserve hard links
 # -   `-c` skip based on checksum, not size and date
 # -   `--delete` delete extraneous files from dest dirs
 
@@ -128,6 +130,5 @@ exec &> >(tee "$tmpfile")
 
 ### Execute
 
-echo rsync -na ${opt_checksum:+"$opt_checksum"} --itemize-changes --hard-links ${opt_delete:+"$opt_delete"} --info=progress2 "$src" "$tar"
-echo
-exec rsync -na ${opt_checksum:+"$opt_checksum"} --itemize-changes --hard-links ${opt_delete:+"$opt_delete"} --info=progress2 "$src" "$tar"
+set -x
+exec rsync -ni -aH ${opt_checksum:+"$opt_checksum"} ${opt_delete:+"$opt_delete"} --info=progress2 "$src" "$tar"
