@@ -35,7 +35,6 @@ GCLOUD_TOKEN="$(gcloud auth application-default print-access-token)"
 if [[ -z "${GCLOUD_TOKEN:-}" ]]; then
     echo "$0: error: could not get gcloud auth token. Did you set the GOOGLE_APPLICATION_CREDENTIALS envvar?" >&2
     exit 1
-    echo 
 fi
 
 #
@@ -46,7 +45,7 @@ fi
 # NOTE: macOS mktemp requires XXXXXXXX to be at the end
 screenshot="$(mktemp "${TMP:-/tmp}/$(basename "$0").png.XXXXXXX")"
 cleanup() {
-  [ -e "$screenshot" ] && rm -f "$screenshot"
+    [ -e "$screenshot" ] && rm -f "$screenshot"
 }
 trap cleanup HUP INT QUIT TERM EXIT
 
@@ -66,27 +65,28 @@ screencapture -i "$screenshot"
 #     "en"
 #   ]
 # }
+
 if curl -sH"Authorization: Bearer $GCLOUD_TOKEN" \
-   -HContent-Type:application/json\;charset=utf-8 \
-   https://vision.googleapis.com/v1/images:annotate \
-   -d@<(printf %s '{
-      "requests": [{
-        "image": {
-          "content": "'"$(base64 "$screenshot")"'"
-        },
-        "features": [
-          {
-            "maxResults": 1000,
-            "type": "DOCUMENT_TEXT_DETECTION"
-          }
-        ]
-      }]
-    }') | \
-   jq -r '.responses[0].fullTextAnnotation.text' |
-   pbcopy
+    -HContent-Type:application/json\;charset=utf-8 \
+    https://vision.googleapis.com/v1/images:annotate \
+    -d@<(printf %s '{
+        "requests": [{
+            "image": {
+            "content": "'"$(base64 "$screenshot")"'"
+            },
+            "features": [
+            {
+                "maxResults": 1000,
+                "type": "DOCUMENT_TEXT_DETECTION"
+            }
+            ]
+        }]
+        }') | \
+    jq -r '.responses[0].fullTextAnnotation.text' |
+    pbcopy
 then
-  osascript -e 'display notification "Successfully extracted to clipboard" with title "screencap-ocr" sound name "Blow"'
-  osascript -e 'display dialog (the clipboard) with title "screencap-ocr" buttons {"OK"} default button 1'
+    osascript -e 'display notification "Successfully extracted to clipboard" with title "screencap-ocr" sound name "Blow"'
+    osascript -e 'display dialog (the clipboard) with title "screencap-ocr" buttons {"OK"} default button 1'
 else
-  osascript -e 'display notification "Failed to extract to clipboard" with title "screencap-ocr" sound name "Basso"'
+    osascript -e 'display notification "Failed to extract to clipboard" with title "screencap-ocr" sound name "Basso"'
 fi
