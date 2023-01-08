@@ -34,14 +34,15 @@ These tools were initially created by me.
 Mac folder
 ----------
 
-| Command                        | Description                                          |
-| ---                            | ---                                                  |
+| Command                        | Description                                                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
 | `autoclear-clipboard`          | Automatically clears passwords from clipboard after a brief time (because Universal Clipboard is dangerous) |
-| `bundle-id`                    | Displays the bundle ID of specific application (useful for `terminal-notifier`) |
-| `eject`                        | Ejects a removable disk by user-friendly volume name |
-| `list-installed-electron-apps` | Lists which of the installed Applications run Electron |
-| `screencap-ocr`                | Lets you take a screenshot and puts the OCR'd text in your clipboard |
-| `show-dev-sig-of-running-apps` | Displays Dev Signatures of running apps              |
+| `bundle-id`                    | Displays the bundle ID of specific application (useful for `terminal-notifier`)                             |
+| `eject`                        | Ejects a removable disk by user-friendly volume name                                                        |
+| `list-installed-electron-apps` | Lists which of the installed Applications run Electron                                                      |
+| `mountpoint`                   | Like on linux, checks if a file/dir is a mountpoint                                                         |
+| `screencap-ocr`                | Lets you take a screenshot and puts the OCR'd text in your clipboard                                        |
+| `show-dev-sig-of-running-apps` | Displays Dev Signatures of running apps                                                                     |
 
 Contrib folder
 --------------
