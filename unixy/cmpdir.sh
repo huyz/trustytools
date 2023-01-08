@@ -8,10 +8,10 @@
 # ```shell
 # rsync -ni -aH -c --delete --info=progress2 /SOURCE/FOLDER/ /TARGET/FOLDER 2>&1 | tee /tmp/rsync.FOLDER.log
 # ```
-# 
-# 
+#
+#
 # Be careful to end the first folder name (the source) with a `/`. The options are
-# 
+#
 # -   `-n` dry-run (make no changes)
 # -   `-i` itemize changes
 # -   `-a` archive mode: preserve (i.e. compare since we have `-n`) permissions, ownerships, symbolic links, etc. and recurse down directories
@@ -26,36 +26,36 @@ trap exit INT  # So that ^C will stop the entire script, not just the current su
 ### Check arguments
 
 usage() {
-  echo "Usage: $0 [-c] [-i] source_dir target_dir" >&2
-  echo "       -c : compare checksums (instead of just filesize and timestamp)" >&2
-  echo "       -i : ignore extra files at the destination" >&2
-  exit 1
+    echo "Usage: $0 [-c] [-i] source_dir target_dir" >&2
+    echo "       -c : compare checksums (instead of just filesize and timestamp)" >&2
+    echo "       -i : ignore extra files at the destination" >&2
+    exit 1
 }
 
 opt_checksum=
 opt_delete=--delete
 while [[ $# -gt 2 ]]; do
-  case "${1:-}" in
-    -c) opt_checksum="$1" ;;
-    -i) opt_delete= ;;
-    *) usage ;;
-  esac
-  shift
+    case "${1:-}" in
+        -c) opt_checksum="$1" ;;
+        -i) opt_delete= ;;
+        *) usage ;;
+    esac
+    shift
 done
 
 if [[ $# != 2 ]]; then
-  usage
+    usage
 fi
 src="$1"
 tar="$2"
 
 if [[ ! -d "$src" ]]; then
-  echo "Source directory $src does not exist" >&2
-  exit 1
+    echo "Source directory $src does not exist" >&2
+    exit 1
 fi
 if [[ ! -d "$tar" ]]; then
-  echo "Target directory $tar does not exist" >&2
-  exit 1
+    echo "Target directory $tar does not exist" >&2
+    exit 1
 fi
 
 # Must end in slash to compare the contents of the directory
@@ -72,9 +72,9 @@ that differs. There is no output if they are the same. The code has columns
 is ok, or a letter:
 
 ```
-Y is type of update: 
+Y is type of update:
    < sent (not appropriate in this case)
-   > need to copy 
+   > need to copy
    c missing file or directory
    h is hard link
    . no update
@@ -131,4 +131,4 @@ exec &> >(tee "$tmpfile")
 ### Execute
 
 set -x
-exec rsync -ni -aH ${opt_checksum:+"$opt_checksum"} ${opt_delete:+"$opt_delete"} --info=progress2 "$src" "$tar"
+exec rsync -ni -aH ${opt_checksum:+"$opt_checksum"} ${opt_delete:+"$opt_delete"} --info=progress2 --exclude='.git' --exclude='.idea' --exclude='.mypy_cache' "$src" "$tar"
