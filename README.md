@@ -24,6 +24,8 @@ These tools were initially created by me.
                   using [github.com](http://github.com/)'s stylesheet. Useful
                   for checking files, e.g. `README.mkd`, before pushing to
                   github.
+*   `ssh-add-l` - Better listing of keys added to SSH agent (includes filenames)
+*   `ssh-keygen-l` - Better listing of private keys (includes comments)
 *   `unln`      - Replaces a symlinked file with a copy so that it can be
                   edited separately
 *   `untar`     - Extracts all or specific files from within a tar archive
