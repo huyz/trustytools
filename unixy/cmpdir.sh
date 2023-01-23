@@ -50,11 +50,11 @@ src="$1"
 tar="$2"
 
 if [[ ! -d "$src" ]]; then
-    echo "Source directory $src does not exist" >&2
+    echo "${BASH_SOURCE[0]}: Error: source directory $src does not exist" >&2
     exit 1
 fi
 if [[ ! -d "$tar" ]]; then
-    echo "Target directory $tar does not exist" >&2
+    echo "${BASH_SOURCE[0]}: Error: Target directory $tar does not exist" >&2
     exit 1
 fi
 
