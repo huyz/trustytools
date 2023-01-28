@@ -10,9 +10,9 @@ ssh-add -l | \
         keysize="${line%% *}"
         fingerprint="$(echo "$line" | cut -d' ' -f2)"
         for file in ~/.ssh/*.pub; do
-            printf "%s %s\n" \
+            printf "%s | %s\n" \
                 "$(ssh-keygen -lf "$file")" \
-                "${file/$HOME/~}"
-        done | column -t | grep "$fingerprint" \
+                "${file//$HOME\/.ssh\//}"
+        done | column -t -s '|' | grep "$fingerprint" \
             || echo "$keysize $line";
     done
