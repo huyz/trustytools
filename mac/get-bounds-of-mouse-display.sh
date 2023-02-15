@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Returns the bounds of the display where the mouse is located in the form:
-# x y width height
+#   x y width height
+# To use from AppleScript:
+#   set displayBounds to do shell script "PATH=/opt/homebrew/bin:$PATH /Users/huyz/bin/get-bounds-of-mouse-display | xargs -n 1 echo"
+#	set displayBounds to the paragraphs of displayBounds
+
 
 [ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: Error: bash v4+ required." >&2; exit 1; }
 
