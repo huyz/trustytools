@@ -41,6 +41,7 @@ Mac folder
 | `autoclear-clipboard`          | Automatically clears passwords from clipboard after a brief time (because Universal Clipboard is dangerous) |
 | `bundle-id`                    | Displays the bundle ID of specific application (useful for `terminal-notifier`)                             |
 | `eject`                        | Ejects a removable disk by user-friendly volume name                                                        |
+| `get-bounds-of-mouse-display`  | Displays the bounds of the display where the mouse is |
 | `list-installed-electron-apps` | Lists which of the installed Applications run Electron                                                      |
 | `mountpoint`                   | Like on linux, checks if a file/dir is a mountpoint                                                         |
 | `screencap-ocr`                | Lets you take a screenshot and puts the OCR'd text in your clipboard                                        |
