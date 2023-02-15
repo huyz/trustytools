@@ -26,7 +26,7 @@ done
 
 displays="$(displayplacer list | perl -ne '
     ($width, $height) = ($1, $2) if /^Resolution:\s+(\d+)x(\d+)$/;
-    if (defined($width) and /^Origin:\s+\((\d+),(\d+)\).*$/) {
+    if (defined($width) and /^Origin:\s+\(([\d-]+),([\d-]+)\).*$/) {
         $x = $1;
         $y = $2;
         print "$x $y $width $height\n";
