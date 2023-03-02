@@ -10,6 +10,7 @@ Unixy folder
 ------------
 These tools were initially created by me.
 
+*   `brew-deptree` - Displays dependency tree for all installed packages
 *   `carc`      - Simply and safely archive files with optional gpg encryption *   `cdiff`     - Wrapper for diff to add colors both at the line and word level
 *   `clfu`      - Displays quick-reference for the top 100 commands at
                   [commandlinefu.com](http://commandlinefu.com)
