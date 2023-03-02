@@ -17,6 +17,7 @@ These tools were initially created by me.
 *   `cmpdir`    - Wrapper for rsync to compare two directory trees by checksum
 *   `decrypt`   - Simply decrypts all sorts of gpg-encrypted files
 *   `encrypt`   - Simply encrypts files with gpg
+*   `git-list-big-objects` - Lists the biggest objects in a git repository
 *   `ldwhich`   - Finds location of a dynamic library by traversing the
                   search path, for Linux, OS X, and other Unix systems.
 *   `list`      - Simply shows/lists files with the right pager(s) depending
