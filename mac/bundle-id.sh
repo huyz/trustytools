@@ -11,6 +11,10 @@
 # Created on:       2014-06-17
 #
 # Usage:
-#   bundle-id "Finder" ...
+#   bundle-id "Finder" bundle-id "/System/Applications/App Store.app" ...
 
-exec osascript -e "id of app \"$*\""
+for i in "$@"; do
+    # NOTE: an alternative is to use `mdls -name kMDItemCFBundleIdentifier -r "$*"`
+    #   but that one only accepts a path.
+    osascript -e "id of app \"$i\""
+done
