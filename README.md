@@ -35,10 +35,12 @@ useful for everyday use.
 | `bundle-id`                       | Displays the bundle ID of specific application (useful for `terminal-notifier`)                             |
 | `eject`                           | Ejects a removable disk by user-friendly volume name                                                        |
 | `get-bounds-of-mouse-display`     | Displays the bounds of the display where the mouse is                                                       |
+| `is-app-running`                  | Checks if the given application (using macOS friendly name) is running                                      |
 | `list-installed-electron-apps`    | Lists which of the installed Applications run Electron                                                      |
 | `mountpoint`                      | Like on linux, checks if a file/dir is a mountpoint                                                         |
 | `port-inactive-safe-to-uninstall` | List inactive MacPorts package versions that have active replacements                                       |
 | `port-uninstall-inactive-safely`  | Uninstalls inactive MacPorts package versions that have active replacements                                 |
+| `quit-app`                        | Closes an application (using macOS friendly name); often works better than `pkill`, e.g. for Google Drive   |
 | `screencap-ocr`                   | Lets you take a screenshot and puts the OCR'd text in your clipboard                                        |
 | `show-dev-sig-of-running-apps`    | Displays Dev Signatures of running apps                                                                     |
 
