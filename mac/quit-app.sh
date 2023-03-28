@@ -15,8 +15,8 @@ if [[ $EUID -eq 0 ]]; then
     [ -x "${GETOPT:=/opt/local/bin/getopt}" ] || \
         { echo "$0: Error: \`sudo port install util-linux\` to install $GETOPT." >&2; exit 1; }
 else
-    [ -x "${GETOPT:="$HOMEBREW_PREFIX/opt/gnu-getopt/bin/getopt"}" ] || \
-        { echo "$0: Error: \`brew install gnu-getopt\` to install $GETOPT." >&2; exit 1; }
+    [ -x "${GETOPT:="$HOMEBREW_PREFIX/opt/util-linux/bin/getopt"}" ] || \
+        { echo "$0: Error: \`brew install util-linux\` to install $GETOPT." >&2; exit 1; }
 fi
 
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
