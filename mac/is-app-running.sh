@@ -1,5 +1,6 @@
 #!/bin/bash
 # Return success if given app is running
+# If the name of the app has two or more dots, it's assumed to be the bundle identifier.
 
 set -euo pipefail
 shopt -s failglob
@@ -20,7 +21,25 @@ fi
 
 app="$1"
 
-if osascript -e "tell application \"System Events\" to (name of processes) contains \"$app\"" | grep -q 'true'; then
+if [[ "$app" == *.*.* ]]; then
+    property="bundle identifier"
+elif [[ "$app" == "iTerm2" ]]; then
+    # Running process shows up as "iTerm"
+    property="bundle identifier"
+    app="com.googlecode.iterm2"
+elif [[ "$app" == "Visual Studio Code" ]]; then
+    # In the case of "Visual Studio Code", the process name shows up as "Electron" and is hidable by "Code" or bundle ID
+    property="bundle identifier"
+    app="com.microsoft.VSCode"
+elif [[ "$app" == "IntelliJ IDEA" ]]; then
+    # Running process shows up as "idea"
+    property="bundle identifier"
+    app="com.jetbrains.intellij"
+else
+    property="name"
+fi
+
+if osascript -e "tell application \"System Events\" to ($property of processes) contains \"$app\"" | grep -q 'true'; then
     exit 0
 else
     exit 1

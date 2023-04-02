@@ -1,5 +1,6 @@
 #!/bin/bash
 # Quits an app if it's running
+# If the name of the app has two or more dots, it's assumed to be the bundle identifier.
 
 #### Preamble (template v2023-01-31)
 
@@ -82,13 +83,21 @@ function confirm {
 
 #### Main
 
+
+
 for app in "$@"; do
     [[ -n $opt_debug ]] && echo "𐄫 Checking app ${app}…"
     if is-app-running "$app"; then
-        if [[ -n $opt_dry_run ]]; then
-            confirm -p "$opt_prompt $app" echo "⋱ would have run: osascript -e \"quit app \\\"$app\\\"\""
+        if [[ "$app" == *.*.* ]]; then
+            property="id"
         else
-            confirm -p "$opt_prompt $app" osascript -e "quit app \"$app\""
+            property=""
+        fi
+
+        if [[ -n $opt_dry_run ]]; then
+            confirm -p "$opt_prompt $app" echo "⋱ would have run: osascript -e \"quit app $property \\\"$app\\\"\""
+        else
+            confirm -p "$opt_prompt $app" osascript -e "quit app $property \"$app\""
         fi
     fi
 done
