@@ -26,10 +26,11 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 function usage {
     cat <<END >&2
-Usage: $SCRIPT_NAME [-h|--help] [-d|--debug] [-n|--dry-run] [-p prompt|--prompt prompt] app...
+Usage: $SCRIPT_NAME [-h|--help] [-d|--debug] [-n|--dry-run] [-y|--yes] [-p|--prompt prompt] app...
         -h|--help: get help
         -d|--debug: turn on debug mode
         -n|--dry-run: do not make any modifications
+        -y|--yes: auto-confirm (do not prompt)
         -p prompt|--prompt prompt: string to display to confirm whether to quit the app
             (without a question mark; app name will be appended before question mark)
             Default: "Quit app"
@@ -40,9 +41,10 @@ END
 # Defaults
 opt_debug=
 opt_dry_run=
+opt_yes=
 opt_prompt="Quit app"
 
-opts=$($GETOPT --options hdnp: --long help,debug,dry-run,prompt: --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$($GETOPT --options hdnyp: --long help,debug,dry-run,yes,prompt: --name "$SCRIPT_NAME" -- "$@") || usage
 eval set -- "$opts"
 
 while true; do
@@ -50,9 +52,10 @@ while true; do
         -h | --help) usage ;;
         -d | --debug) opt_debug=opt_debug; shift ;;
         -n | --dry-run) opt_dry_run=opt_dry_run; shift ;;
+        -y | --yes) opt_yes=opt_yes; shift ;;
         -p | --prompt) opt_prompt="$2"; shift 2 ;;
         --) shift; break ;;
-        *) echo "$SCRIPT_NAME: Internal error: '$1'" >&2; exit 1 ;;
+        *) echo "$SCRIPT_NAME: Internal error: unrecognized option '$1'" >&2; exit 1 ;;
     esac
 done
 
@@ -68,7 +71,11 @@ function confirm {
         message="$2"
         shift 2
     fi
-    read -rp "$message? [Y/n] "
+    if [[ -n $opt_yes ]]; then
+        REPLY=yes
+    else
+        read -rp "$message? [Y/n] "
+    fi
     case "$REPLY" in
         n* | N*)
             # Must return successful exit code to not abort the script
