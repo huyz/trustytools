@@ -65,13 +65,14 @@ EOF
 if [[ -n ${opt_json-} ]]; then
     # jq manipulation for output as json
     jq_script='
-        # Input is an array with 2 long arrays, the first with names, the second with bundle IDs.
+        # Input is an array with 2 long arrays, the first with process names,
+        # the second with corresponding process bundle IDs.
 
-        [
+        [                                   # create an array to be output
             transpose                       # transpose to an array of small arrays/pairs (name, and bundle ID)
             | sort_by(.[0])                 # sort by the first element (the name)
             | .[]                           # iterate through array of processes
-            | {name: .[0], bundleId: .[1]} # create an object with the name and bundle ID
+            | {name: .[0], bundleId: .[1]}  # for each process, output an object with the name and bundle ID
         ]
 '
     osascript <<<"$as_script"| jq -r "$jq_script"
@@ -79,20 +80,21 @@ else
     # jq manipulation for output as a table
     # See: https://stackoverflow.com/a/39144364/161972
     jq_script='
-        # Input is an array with 2 long arrays, the first with names, the second with bundle IDs.
+        # Input is an array with 2 long arrays, the first with process names,
+        # the second with corresponding process bundle IDs.
 
         transpose                       # transpose to an array of small arrays/pairs (name, and bundle ID)
         | sort_by(.[0])                 # sort by the first element (the name)
         |
             (
-                ["name", "bundle ID"]   # create a title array
+                ["name", "bundle ID"]   # create a title row
                 | (
-                    .,                  # output the title array
-                    map(length * "-")   # output similar array whose elements are dashes of same length as the title array elements
+                    .,                  # output the title row
+                    map(length * "-")   # output similar row whose elements are dashes of same length as the title array elements
                 )
             ),
-            .[]                         # iterate through array of processes
-        | @tsv                          # output as tab-separated values that
+            .[]                         # output through array of processes: one row per process
+        | @tsv                          # output entire input as tab-separated values (for column to process)
 '
     # column: convert the tabs into a variable number of spaces so that the columns are aligned.
     osascript <<<"$as_script"| jq -r "$jq_script" | column -ts $'\t'
