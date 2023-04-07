@@ -1,28 +1,35 @@
 #!/bin/bash
 # Lists running processes, by name and bundle ID.
+# By default, outputs a table.
+# Use -J or --json option to output in JSON.
 
-# For jq, see: https://stackoverflow.com/a/39144364/161972
-jq_script='
-    # Input is an array with 2 long arrays, the first with names, the second with bundle IDs.
-
-    transpose                       # transpose to an array of small arrays/pairs (name, and bundle ID)
-    | sort_by(.[0])                 # sort by the first element (the name)
-    |
-        (
-            ["name", "bundle ID"]   # create a title array
-            | (
-                .,                  # output the title array
-                map(length * "-")   # output similar array whose elements are dashes of same length as the title array elements
-            )
-        ),
-        .[]                         # iterate through array of processes
-    | @tsv                          # output as tab-separated values that
-'
-
-# column: convert the tabs into a variable number of spaces so that the columns are aligned.
-osascript <<EOF | jq -r "$jq_script" | column -ts $'\t'
+set -euo pipefail
+shopt -s failglob extglob
+# shellcheck disable=SC2317
+function trap_err { echo "ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 
+#### Options
+
+function usage {
+    echo "Usage: $0 [-h|--help] [-J|--json]
+    -J|--json: Output in JSON format.
+"
+    exit 1
+}
+
+if [[ $# -gt 1 || "${1-}" == @(-h|--help) ]]; then
+    usage
+elif [[ "${1-}" == @(-J|--json) ]]; then
+    opt_json=opt_json
+fi
+
+
+# AppleScript to get the list of running processes in JSON.
+read -r -d '' as_script <<'EOF' || true
 ----------------------------------------------------------------
 use AppleScript version "2.5"
 use framework "Foundation"
@@ -53,3 +60,41 @@ tell application "System Events" to set processesList to {name, bundle identifie
 
 its convertASToJSON:processesList saveTo:(missing value)
 EOF
+
+
+if [[ -n ${opt_json-} ]]; then
+    # jq manipulation for output as json
+    jq_script='
+        # Input is an array with 2 long arrays, the first with names, the second with bundle IDs.
+
+        [
+            transpose                       # transpose to an array of small arrays/pairs (name, and bundle ID)
+            | sort_by(.[0])                 # sort by the first element (the name)
+            | .[]                           # iterate through array of processes
+            | {name: .[0], bundleId: .[1]} # create an object with the name and bundle ID
+        ]
+'
+    osascript <<<"$as_script"| jq -r "$jq_script"
+else
+    # jq manipulation for output as a table
+    # See: https://stackoverflow.com/a/39144364/161972
+    jq_script='
+        # Input is an array with 2 long arrays, the first with names, the second with bundle IDs.
+
+        transpose                       # transpose to an array of small arrays/pairs (name, and bundle ID)
+        | sort_by(.[0])                 # sort by the first element (the name)
+        |
+            (
+                ["name", "bundle ID"]   # create a title array
+                | (
+                    .,                  # output the title array
+                    map(length * "-")   # output similar array whose elements are dashes of same length as the title array elements
+                )
+            ),
+            .[]                         # iterate through array of processes
+        | @tsv                          # output as tab-separated values that
+'
+    # column: convert the tabs into a variable number of spaces so that the columns are aligned.
+    osascript <<<"$as_script"| jq -r "$jq_script" | column -ts $'\t'
+fi
+
