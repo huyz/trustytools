@@ -2,20 +2,25 @@
 # Lists running processes, by name and bundle ID.
 
 # For jq, see: https://stackoverflow.com/a/39144364/161972
-# Input is an array with 2 long arrays, the first with names, the second with bundle IDs.
-# - create a new array for processes
-#   - transpose the input so that we have an array of small arrays, each with 2 elements, the first being the name, the second the bundle ID
-#   - for each of those small arrays, create a new object with the name and bundle ID as properties
-# - sort the processes array by name
-#
-# - create a title array
-# - create a similar array with the same number of elements as the header array, each element being a string of dashes
-# - output these two header arrays
-# - output the array of process arrays
-# - convert the entire output to tab-separated values
-#
-# Use `column` to convert the tabs into a variable number of spaces so that the columns are aligned.
-osascript <<EOF | jq -r '[ transpose | .[] | {name: .[0], bundleId: .[1]} ] | sort_by(.name) | ( ["name", "bundle ID"] | (., map(length*"-")) ), ( .[] | [.name, .bundleId] ) | @tsv' | column -ts $'\t'
+jq_script='
+    # Input is an array with 2 long arrays, the first with names, the second with bundle IDs.
+
+    transpose                       # transpose to an array of small arrays/pairs (name, and bundle ID)
+    | sort_by(.[0])                 # sort by the first element (the name)
+    |
+        (
+            ["name", "bundle ID"]   # create a title array
+            | (
+                .,                  # output the title array
+                map(length * "-")   # output similar array whose elements are dashes of same length as the title array elements
+            )
+        ),
+        .[]                         # iterate through array of processes
+    | @tsv                          # output as tab-separated values that
+'
+
+# column: convert the tabs into a variable number of spaces so that the columns are aligned.
+osascript <<EOF | jq -r "$jq_script" | column -ts $'\t'
 
 
 ----------------------------------------------------------------
