@@ -10,9 +10,18 @@ ssh-add -l | \
         keysize="${line%% *}"
         fingerprint="$(echo "$line" | cut -d' ' -f2)"
         for file in ~/.ssh/*.pub; do
-            printf "%s | %s\n" \
-                "$(ssh-keygen -lf "$file")" \
-                "${file//$HOME\/.ssh\//}"
-        done | column -t -s '|' | grep "$fingerprint" \
+            candidate_fp="$(ssh-keygen -lf "$file")"
+            if [[ "$candidate_fp" == *"$fingerprint"* ]]; then
+                echo "${file//$HOME\/.ssh\//}"
+                pub="$(<"$file")"
+                if [[ "$pub" == ssh-rsa* ]]; then
+                    pub="$(<"$file" sed -E 's/(.{40}).*(.{50})/\1 … \2/')"
+                fi
+                printf "  %s\n  %s\n" \
+                    "$candidate_fp" \
+                    "$pub"
+
+            fi
+        done \
             || echo "$keysize $line";
     done
