@@ -5,6 +5,7 @@
 # Based on:
 # https://unix.stackexchange.com/questions/58969/how-to-list-keys-added-to-ssh-agent-with-ssh-add/566474#566474
 
+count=0
 ssh-add -l | \
     while read -r line; do
         keysize="${line%% *}"
@@ -17,7 +18,9 @@ ssh-add -l | \
                 if [[ "$pub" == ssh-rsa* ]]; then
                     pub="$(<"$file" sed -E 's/(.{40}).*(.{50})/\1 … \2/')"
                 fi
-                printf "  %s\n  %s\n" \
+                (( count++ ))
+                printf "%2s. %s\n    %s\n" \
+                    "$count" \
                     "$candidate_fp" \
                     "$pub"
 
