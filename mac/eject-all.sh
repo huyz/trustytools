@@ -25,9 +25,9 @@ disks=$(diskutil list external | sed -n '/[Ss]cheme/s/.*B *//p')
 
 if [ "$disks" ]; then
     fail=0
-    echo "$disks" | while read -r line ; do
+    while read -r line ; do
         diskutil unmountDisk "/dev/$line" || (( fail++ ))
-    done
+    done <<< "$disks"
     if (( fail > 0 )); then
         notify "❌ Failed to eject $fail disk(s)."
         exit 1
