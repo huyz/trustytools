@@ -74,10 +74,11 @@ function confirm {
     if [[ -n $opt_yes ]]; then
         REPLY=yes
     else
-        read -rp "$message? [Y/n] "
+        read -rp "$message? [Y/n] " -n 1
+        echo
     fi
     case "$REPLY" in
-        n* | N*)
+        n|N)
             # Must return successful exit code to not abort the script
             return 0
             ;;
@@ -104,7 +105,7 @@ for app in "$@"; do
         if [[ -n $opt_dry_run ]]; then
             confirm -p "$opt_prompt $app" echo "⋱ would have run: osascript -e \"quit app $property \\\"$app\\\"\""
         else
-            confirm -p "$opt_prompt $app" osascript -e "quit app $property \"$app\""
+            confirm -p "$opt_prompt $app" osascript -e "quit app $property \"$app\"" || true
         fi
     fi
 done
