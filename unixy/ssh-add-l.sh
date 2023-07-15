@@ -5,26 +5,33 @@
 # Based on:
 # https://unix.stackexchange.com/questions/58969/how-to-list-keys-added-to-ssh-agent-with-ssh-add/566474#566474
 
-count=0
+count=1
 ssh-add -l | \
     while read -r line; do
         keysize="${line%% *}"
         fingerprint="$(echo "$line" | cut -d' ' -f2)"
-        for file in ~/.ssh/*.pub; do
-            candidate_fp="$(ssh-keygen -lf "$file")"
+        matched=
+        for filename in ~/.ssh/*.pub; do
+            candidate_fp="$(ssh-keygen -lf "$filename")"
             if [[ "$candidate_fp" == *"$fingerprint"* ]]; then
-                echo "${file//$HOME\/.ssh\//}"
-                pub="$(<"$file")"
+                filename_short="${filename//$HOME\/.ssh\//}"
+                pub="$(<"$filename")"
                 if [[ "$pub" == ssh-rsa* ]]; then
-                    pub="$(<"$file" sed -E 's/(.{40}).*(.{50})/\1 … \2/')"
+                    pub="$(<"$filename" sed -E 's/(.{40}).*(.{50})/\1 … \2/')"
                 fi
-                (( count++ ))
-                printf "%2s. %s\n    %s\n" \
+                printf "%2s. %s\n    %s\n      %s\n" \
                     "$count" \
                     "$candidate_fp" \
+                    "${filename_short}:" \
                     "$pub"
-
+                (( count++ ))
+                matched=1
             fi
-        done \
-            || echo "$keysize $line";
+        done
+        if [[ -z "${matched-}" ]]; then
+            printf "%2s. %s\n" \
+                    "$count" \
+                    "$keysize $line"
+            (( count++ ))
+        fi
     done
