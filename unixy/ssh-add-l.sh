@@ -8,6 +8,10 @@
 count=1
 ssh-add -l | \
     while read -r line; do
+        if [[ "$line" == *"agent has no identities"* ]]; then
+            echo "$line"
+            break
+        fi
         keysize="${line%% *}"
         fingerprint="$(echo "$line" | cut -d' ' -f2)"
         matched=
