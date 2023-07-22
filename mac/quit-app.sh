@@ -75,7 +75,7 @@ function confirm {
     if [[ -n $opt_yes ]]; then
         REPLY=yes
     else
-        read -rp "$message? [Y/n] " -n 1
+        read -rp "$message? [Y/n]" -n 1
         echo
     fi
     case "$REPLY" in
