@@ -1,6 +1,7 @@
 #!/bin/bash
 # 2020-12-06 Lists the names and dates of the iTunes backups of iOS/iPadOS
 #   devices
+# Usage: -v for verbose mode (displays size)
 
 set -euo pipefail
 shopt -s failglob
