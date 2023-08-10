@@ -7,7 +7,7 @@ shopt -s failglob
 trap exit INT
 
 
-DIR=~/"Library/Application Support/iMobie/Backup"
+DIR=~/"Library/Application Support/iMobie/Backups"
 
 cd "$DIR"
 
