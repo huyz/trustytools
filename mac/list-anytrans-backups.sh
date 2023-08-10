@@ -11,6 +11,7 @@ DIR=~/"Library/Application Support/iMobie/Backup"
 
 cd "$DIR"
 
+# shellcheck disable=SC2012
 ls -1dt ./[0-9a-f]*/. | while read -r i; do
     i="$(dirname "$i")"
     if [[ ! -e "$i/Info.plist" ]]; then
