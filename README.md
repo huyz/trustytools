@@ -40,6 +40,7 @@ useful for everyday use.
 | `is-app-running`                  | Checks if the given application (using macOS friendly name) is running                                      |
 | `list-installed-electron-apps`    | Lists which of the installed Applications run Electron                                                      |
 | `list-processes`                  | Lists running processes as seen from "System Events"                                                        |
+| `list-tm-backups`                 | Lists all the Time Machine backups                                                                          |
 | `mountpoint`                      | Like on linux, checks if a file/dir is a mountpoint                                                         |
 | `port-inactive-safe-to-uninstall` | List inactive MacPorts package versions that have active replacements                                       |
 | `port-uninstall-inactive-safely`  | Uninstalls inactive MacPorts package versions that have active replacements                                 |
