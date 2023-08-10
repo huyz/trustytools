@@ -38,7 +38,9 @@ useful for everyday use.
 | `eject`                           | Ejects a removable disk by user-friendly volume name                                                        |
 | `get-bounds-of-mouse-display`     | Displays the bounds of the display where the mouse is                                                       |
 | `is-app-running`                  | Checks if the given application (using macOS friendly name) is running                                      |
+| `list-anytrans-backups`           | Lists all the mobile device backups made by iMobie AnyTrans                                                 |
 | `list-installed-electron-apps`    | Lists which of the installed Applications run Electron                                                      |
+| `list-mobilesync-backups`         | Lists all the mobile device backups made by macOS                                                           |
 | `list-processes`                  | Lists running processes as seen from "System Events"                                                        |
 | `list-tm-backups`                 | Lists all the Time Machine backups                                                                          |
 | `mountpoint`                      | Like on linux, checks if a file/dir is a mountpoint                                                         |
