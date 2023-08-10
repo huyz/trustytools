@@ -17,6 +17,10 @@ fi
 
 for mountpoint in "${destinations[@]}"; do
     echo "--- $mountpoint ---"
-    tmutil listbackups -d "$mountpoint"
+    tmutil listbackups -d "$mountpoint" -m | while read -r backup; do
+        time="$(sed -n 's,.*/\(.*\)\.backup$,\1,p' <<<"$backup")"
+        size="$(tmutil uniquesize "$backup" | awk '{print $1}')"
+        printf "%s %8s\n" "$time" "$size"
+    done
     echo
 done
