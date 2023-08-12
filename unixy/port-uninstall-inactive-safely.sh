@@ -8,7 +8,7 @@
 port-inactive-safe-to-uninstall
 
 echo
-read -r -p "𐄫 Uninstall inactive versions? [Y/n] (⏳3s)" -n 1 -t 3 || REPLY=y
+read -r -p "𐄫 Uninstall inactive versions? [Y/n] (⏳10s)" -n 1 -t 10 || REPLY=y
 echo
 
 if [[ $REPLY == [yY] ]]; then
