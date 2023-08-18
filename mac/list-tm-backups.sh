@@ -8,6 +8,9 @@ set -euo pipefail
 shopt -s failglob
 trap exit INT
 
+# Force network backup mount (necessary if your TM backups are through the network)
+tmutil listbackups &>/dev/null
+
 readarray -t destinations < <(tmutil destinationinfo | sed -n 's/^Mount Point *: *\(.*\)/\1/p')
 
 if [[ -z ${destinations+x} ]]; then
