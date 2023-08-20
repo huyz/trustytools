@@ -9,7 +9,7 @@ shopt -s failglob
 trap exit INT
 
 # Force network backup mount (necessary if your TM backups are through the network)
-tmutil listbackups &>/dev/null
+tmutil listbackups &>/dev/null || true
 
 readarray -t destinations < <(tmutil destinationinfo | sed -n 's/^Mount Point *: *\(.*\)/\1/p')
 
@@ -20,7 +20,7 @@ fi
 
 for mountpoint in "${destinations[@]}"; do
     echo "--- $mountpoint ---"
-    tmutil listbackups -d "$mountpoint" -m | while read -r backup; do
+    (tmutil listbackups -d "$mountpoint" -m || true) | while read -r backup; do
         time="$(sed -n 's,.*/\(.*\)\.backup$,\1,p' <<<"$backup")"
         size="$(tmutil uniquesize "$backup" | awk '{print $1}')"
         printf "%s %8s\n" "$time" "$size"
