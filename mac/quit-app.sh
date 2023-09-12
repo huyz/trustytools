@@ -92,7 +92,7 @@ function confirm {
 
 #### Main
 
-
+exit_code=0
 
 for app in "$@"; do
     [[ -n $opt_debug ]] && echo "𐄫 Checking app ${app}…"
@@ -108,5 +108,9 @@ for app in "$@"; do
         else
             confirm -p "$opt_prompt $app" osascript -e "quit app $property \"$app\"" || true
         fi
+    else
+        exit_code=1
     fi
 done
+
+exit "$exit_code"
