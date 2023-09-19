@@ -2,21 +2,26 @@
 # Return success if given app is running
 # If the name of the app has two or more dots, it's assumed to be the bundle identifier.
 
+
+#### Preamble (v2023-08-28)
+
 set -euo pipefail
 shopt -s failglob
 # shellcheck disable=SC2317
 function trap_err { echo "ERR signal on line $(caller)" >&2; }
 trap trap_err ERR
 trap exit INT
-export PS4='+(BASH_SOURCE:LINENO): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
-#### Arguments
-
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <app>" >&2
-    exit 1
+if [[ $OSTYPE == darwin* ]]; then
+    [ -x "${TIMEOUT:="$HOMEBREW_PREFIX/bin/timeout"}" ] || \
+        { echo "$0: Error: \`brew install coreutils\` to install $TIMEOUT." >&2; exit 1; }
+else
+    TIMEOUT="timeout"
 fi
 
+
+##############################################################################
 #### Main
 
 app="$1"
@@ -39,7 +44,7 @@ else
     property="name"
 fi
 
-if osascript -e "tell application \"System Events\" to ($property of processes) contains \"$app\"" | grep -q 'true'; then
+if $TIMEOUT 10 osascript -e "tell application \"System Events\" to ($property of processes) contains \"$app\"" | grep -q 'true'; then
     exit 0
 else
     exit 1
