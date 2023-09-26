@@ -14,6 +14,8 @@ trap exit INT
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 if [[ $OSTYPE == darwin* ]]; then
+    HOMEBREW_PREFIX="$( (/opt/homebrew/bin/brew --prefix || /usr/local/bin/brew --prefix || brew --prefix) 2>/dev/null)"
+
     [ -x "${TIMEOUT:="$HOMEBREW_PREFIX/bin/timeout"}" ] || \
         { echo "$0: Error: \`brew install coreutils\` to install $TIMEOUT." >&2; exit 1; }
 else
