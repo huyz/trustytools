@@ -11,7 +11,7 @@ echo
 read -r -p "𐄫 Uninstall inactive versions? [Y/n] (⏳10s)" -n 1 -t 10 || REPLY=y
 echo
 
-if [[ $REPLY == [yY] ]]; then
+if [[ $REPLY == '' || $REPLY == [yY] ]]; then
     join -1 1 -2 1 <(port echo inactive | sort) <(port echo active | sort) \
         | cut -f1-2 -d" " \
         | xargs -n 2 -I '{}' sh -c 'echo "𐄬 Uninstalling {}…"; sudo port uninstall {}'
