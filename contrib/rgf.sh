@@ -32,10 +32,11 @@ INITIAL_QUERY="${*:-}"
     --bind 'ctrl-f:preview-page-down,ctrl-b:preview-page-up' \
     --bind 'ctrl-y:execute-silent(echo -n {4..} | pbcopy)' \
     --bind 'ctrl-v:execute(vi {1} +"call cursor({2},{3})")' \
+    --bind 'ctrl-t:execute-silent(code --goto {1}:{2}:{3})' \
     --bind 'ctrl-o:execute-silent(code --goto {1}:{2}:{3})' \
     \
     --color "hl:-1:underline,hl+:-1:underline:reverse" \
-    --header '^Y copy  ^V vi  ^O code  ^R rg  ^Z fzf  ^/ preview  ^F,^B page' \
+    --header '^Y copy  ^V vi  ^T idea  ^O code  ^R rg  ^Z fzf  ^/ preview  ^F,^B page' \
     --preview-window 'up,60%,+{2}+3/3,~3' \
     --preview "${BAT_CMD-bat} --theme=GitHub --color=always --style=numbers --highlight-line={2} {1}" \
 
