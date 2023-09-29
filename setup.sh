@@ -143,13 +143,7 @@ cd ~/bin
 
 for subdir in contrib mac unixy; do
     # Install mac scripts only on mac
-    case "$subdir" in
-        */mac/*)
-        case "$OSTYPE" in
-            darwin*) ;;
-            *) continue ;;
-        esac
-    esac
+    [[ $subdir == 'mac' && $OSTYPE != darwin* ]] && continue
 
     case "$subdir" in
         */*) prefix=../.. ;;
