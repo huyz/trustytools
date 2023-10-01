@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
-# For a given app that automatically generates default configs (e.g. kitty, broot),
-# this script does a three-way merge among the previous default config, the
-# new default config, and your possibly-customized config.
+# For a given app that automatically generates default configs (e.g. kitty,
+# broot, powerlevel10k), this script does a three-way merge among the previous
+# default config, the new default config, and your possibly-customized config.
 #
 # Setup:
-#   1. In the given app's config directory, create a `.config-history/` sub-directory
-#   2. In that sub-directory create a `save-default-config` executable script that
+#   1. In the given app's config directory, create a `.config-history/` subdirectory
+#   2. In that subdirectory create a `save-default-config` executable script that
 #      figures out the app's current version and then writes the config files
 #      in a new `default-config-<VERSION_NUMBER>/` subdirectory
+#   3. Create symlinks from the app's config directory to the corresponding files
+#      (or subdirectories) in `.config-history/current-config/`
 #   3a. If you want to work on one or a few config files with fixed filenames,
 #      have VS Code installed. (E.g. kitty only has kitty.conf)
 #   3b. If you want to work on a directory of files (where files come and go)
 #      have Meld installed. (E.g. broot has a directory of config files)
 #
+#   If an app puts their config file(s) in a shared directory like your $HOME,
+#   move them to somewhere more appropriate like `$HOME/.config/appname/`
+#   and use symlinks.
+#   (E.g., ~/.p10k.zsh -> ~/.config/powerlevel10k/.config-history/current-config/.p10k.zsh)
+#
 # After every new app version:
-#   a. For files, run `merge-config-history ~/.config/kitty kitty.conf`.
+#   a. For files, run `merge-config-history ~/.config/kitty kitty.conf`
+#      or `merge-config-history ~/.config/powerlevel10k .p10k.zsh`.
 #      (Multiple filenames could be specified)
-#   b. For a directory,  run `merge-config-history ~/.config/broot`.
+#   b. For a directory, simply run `merge-config-history ~/.config/broot`.
 #
 
 ##############################################################################
