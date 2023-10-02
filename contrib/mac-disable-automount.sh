@@ -28,7 +28,7 @@ if [[ $# -eq 0 ]]; then
 fi
 
 # Add an volume as not auto-mounted to the /etc/fstab file
-# by it's identifier. Also pass in the volume name to add a
+# by its identifier. Also pass in the volume name to add a
 # comment on that line so that we can identify it later.
 function add_identifier {
     ID=$1
