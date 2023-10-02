@@ -56,17 +56,18 @@ useful for everyday use.
 
 Other folks' scripts found here and there.
 
-| Command        | Description                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `relink`       | Relinks symbolic links by perl regular expression on the paths of the links' targets.                                                                        |
-| `ip2geo`       | Given a hostname or IP address, spits out city, state, country {From [commandlinefu.com](http://commandlinefu.com)}                                          |
-| `wp`           | Quickly queries Wikipedia (over DNS!) {From [commandlinefu.com](http://commandlinefu.com)}                                                                   |
-| `netls`        | Graphs the number of connections for each connected remote host {From [commandlinefu.com](http://commandlinefu.com)}                                         |
-| `rgf`          | ripgrep-fzf combo {From [fzf](https://github.com/junegunn/fzf/blob/master/ADVANCED.md#switching-between-ripgrep-mode-and-fzf-mode)                           |
-| `timed-run`    | Run the specified program for a specified maximum number of seconds {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}                       |
-| `timed-read`   | Reads a line of input, but times out after the specified number of seconds {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}                |
-| `timed-choice` | Prompts user with several choices, but times out with a default after the specified number of seconds {By [Eugene Spafford](http://spaf.cerias.purdue.edu/)} |
-| `mailtrim`     | Trim a standard Unix mbox file to the most recent specified number of messages {By [Michael Soulier](http://identi.ca/msoulier)}                             |
+| Command                 | Description                                                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ip2geo`                | Given a hostname or IP address, spits out city, state, country {From [commandlinefu.com](http://commandlinefu.com)}                                          |
+| `mac-disable-automount` | Disables the automounting of specified volumes on macOS                                                                                                      |
+| `netls`                 | Graphs the number of connections for each connected remote host {From [commandlinefu.com](http://commandlinefu.com)}                                         |
+| `relink`                | Relinks symbolic links by perl regular expression on the paths of the links' targets.                                                                        |
+| `rgf`                   | ripgrep-fzf combo {From [fzf](https://github.com/junegunn/fzf/blob/master/ADVANCED.md#switching-between-ripgrep-mode-and-fzf-mode)                           |
+| `timed-run`             | Run the specified program for a specified maximum number of seconds {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}                       |
+| `timed-read`            | Reads a line of input, but times out after the specified number of seconds {By [Expect's Don Libes](http://sourceforge.net/projects/expect/)}                |
+| `timed-choice`          | Prompts user with several choices, but times out with a default after the specified number of seconds {By [Eugene Spafford](http://spaf.cerias.purdue.edu/)} |
+| `mailtrim`              | Trim a standard Unix mbox file to the most recent specified number of messages {By [Michael Soulier](http://identi.ca/msoulier)}                             |
+| `wp`                    | Quickly queries Wikipedia (over DNS!) {From [commandlinefu.com](http://commandlinefu.com)}                                                                   |
 
 
 # MIT License
