@@ -1,5 +1,5 @@
 #!/bin/bash
-# Add all specified volumes to /etc/fstab so that they do not automout on macOS.
+# Add all specified volumes to /etc/fstab to disable automounting
 # Source: https://akrabat.com/prevent-an-external-drive-from-auto-mounting-on-macos/
 
 [ "${EUID:-$UID}" -eq 0 ] || exec sudo -p '[sudo] password for %u: ' -H "$BASH" "$0" "$@"
