@@ -43,11 +43,11 @@ function add_identifier {
     TYPE="$(diskutil info "$ID" | grep "Type (Bundle)" | awk '{print $NF}')"
 
     # Remove this UUID from fstab file
-    sudo sed -i '' "/^UUID=$UUID/d" $FSTAB
+    sed -i '' "/^UUID=$UUID/d" $FSTAB
 
     # Add this UUID to fstab file
     echo "Adding $UUID ($VOLUME_NAME) to $FSTAB …"
-    echo "UUID=$UUID none $TYPE rw,noauto  # $VOLUME_NAME" | sudo tee -a $FSTAB >/dev/null
+    echo "UUID=$UUID none $TYPE rw,noauto  # $VOLUME_NAME" | tee -a $FSTAB >/dev/null
 }
 
 for name in "$@"; do
