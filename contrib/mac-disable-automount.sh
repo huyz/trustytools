@@ -1,6 +1,12 @@
 #!/bin/bash
 # Add all specified volumes to /etc/fstab to disable automounting
 # Source: https://akrabat.com/prevent-an-external-drive-from-auto-mounting-on-macos/
+#
+# Note: Encrypted disks are unlocked before the fstab file is read. In order for
+# this procedure to work with an encrypted disk, you must first mount the disk,
+# unlock it, and save the password in your keychain.
+#   Source: https://discussions.apple.com/docs/DOC-7942
+
 
 [ "${EUID:-$UID}" -eq 0 ] || exec sudo -p '[sudo] password for %u: ' -H "$BASH" "$0" "$@"
 
