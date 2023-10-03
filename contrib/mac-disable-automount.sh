@@ -1,5 +1,9 @@
 #!/bin/bash
-# Add all specified volumes to /etc/fstab to disable automounting
+# Add all specified volumes to /etc/fstab to disable automounting.
+# Usage: mac-disable-automount.sh [-e] disk_name…
+#     -e: disk_name must match exactly (not just substring)
+# After running, reboot or run `sudo automount -vc` take effect.
+#
 # Source: https://akrabat.com/prevent-an-external-drive-from-auto-mounting-on-macos/
 #
 # Note: Encrypted disks are unlocked before the fstab file is read. In order for
@@ -26,12 +30,28 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 FSTAB=/etc/fstab
 
+#### Arguments
+
+function usage {
+    echo "Usage: $SCRIPT_NAME [-e] disk_name…" >&2
+    echo "    -e: disk_name must match exactly (not just substring)" >&2
+    exit 1
+}
+
+case "$1" in
+    -e)
+        opt_exact_match=1
+        shift
+        ;;
+    -*)
+        usage
+        ;;
+esac
+
+[[ $# -eq 0 ]] && usage
+
 #### Main
 
-if [[ $# -eq 0 ]]; then
-    echo "Usage: $SCRIPT_NAME disk_name…" >&2
-    exit 1
-fi
 
 # Add an volume as not auto-mounted to the /etc/fstab file
 # by its identifier. Also pass in the volume name to add a
@@ -66,7 +86,11 @@ for name in "$@"; do
         VOLUME_NAME="${line%|*}"
         ID="${line#*|}"
 
-        [[ "$VOLUME_NAME" != "$name"* ]] && continue
+        if [[ -n "${opt_exact_match:-}" ]]; then
+            [[ "$VOLUME_NAME" != "$name" ]] && continue
+        else
+            [[ "$VOLUME_NAME" != *"$name"* ]] && continue
+        fi
 
         add_identifier "$ID" "$VOLUME_NAME"
     done
