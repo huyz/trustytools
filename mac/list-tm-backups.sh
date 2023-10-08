@@ -64,6 +64,7 @@ tmutil listbackups &>/dev/null || true
 readarray -t destinations < <(tmutil destinationinfo | sed -n 's/^Mount Point *: *\(.*\)/\1/p')
 
 if [[ -z ${destinations+x} ]]; then
+    printf "No volumes mounted.\n\n"
     tmutil destinationinfo
     exit
 fi
