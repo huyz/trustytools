@@ -32,7 +32,7 @@ INITIAL_QUERY="${*:-}"
     --bind 'ctrl-f:preview-page-down,ctrl-b:preview-page-up' \
     --bind 'ctrl-y:execute-silent(echo -n {4..} | pbcopy)' \
     --bind 'ctrl-v:execute(vi {1} +"call cursor({2},{3})")' \
-    --bind 'ctrl-t:execute-silent(code --goto {1}:{2}:{3})' \
+    --bind 'ctrl-t:execute-silent(idea {1}:{2})' \
     --bind 'ctrl-o:execute-silent(code --goto {1}:{2}:{3})' \
     \
     --color "hl:-1:underline,hl+:-1:underline:reverse" \
