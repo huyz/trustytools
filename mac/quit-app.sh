@@ -103,10 +103,19 @@ for app in "$@"; do
             property=""
         fi
 
-        if [[ -n $opt_dry_run ]]; then
-            confirm -p "$opt_prompt $app" echo "⋱ would have run: osascript -e \"quit app $property \\\"$app\\\"\""
+        # 2023-10-10 Dunno why this doesn't work: osascript -e "quit app $property \"Synergy\""
+        if [[ "$app" == synergy ]]; then
+            if [[ -n $opt_dry_run ]]; then
+                confirm -p "$opt_prompt $app" echo "⋱ would have run: pkill synergy"
+            else
+                confirm -p "$opt_prompt $app" pkill synergy || true
+            fi
         else
-            confirm -p "$opt_prompt $app" osascript -e "quit app $property \"$app\"" || true
+            if [[ -n $opt_dry_run ]]; then
+                confirm -p "$opt_prompt $app" echo "⋱ would have run: osascript -e \"quit app $property \\\"$app\\\"\""
+            else
+                confirm -p "$opt_prompt $app" osascript -e "quit app $property \"$app\"" || true
+            fi
         fi
     else
         exit_code=1
