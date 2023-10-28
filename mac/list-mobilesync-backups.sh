@@ -15,15 +15,26 @@ DIR=~/"Library/Application Support/MobileSync/Backup"
 #### Args
 
 opt_verbose=
-if [[ $# -gt 0 ]]; then
+opt_utc=
+
+while [[ $# -gt 0 ]]; do
     case "$1" in
-        -v) opt_verbose=opt_verbose ;;
+        -u)
+            opt_utc=opt_utc
+            shift
+            ;;
+        -v)
+            opt_verbose=opt_verbose
+            shift
+            ;;
         *)
-            echo "Usage: $0 [-v]" >&2
+            echo "Usage: $0 [-v] [-u]" >&2
+            echo "   -v: verbose mode (displays size)" >&2
+            echo "   -u: UTC time zone" >&2
             exit 1
             ;;
     esac
-fi
+done
 
 #### Main
 
@@ -48,7 +59,9 @@ cd "$DIR"
             continue
         fi
         name="$(plutil -p "$i/Info.plist" | sed -n 's/.*Device Name.*"\(.*\)"$/\1/p')"
-        date="$(TZ= stat -f "%Sm" -t "%Y-%m-%d %H:%MZ" "$i/Info.plist" 2>/dev/null)"
+        date="$(
+            [[ -n $opt_utc ]] && export TZ=''
+            stat -f "%Sm" -t "%Y-%m-%dT%H:%M%z" "$i/Info.plist" 2>/dev/null | sed 's/+0000/Z/')"
         vol="$(df "$i" | sed -n '2s,/Volumes/,,;2s/.*%[[:space:]]*//p')"
         printf "%s|%s|%s" "$i" "$name" "$date"
 
