@@ -93,6 +93,8 @@ function colored_icon {
 ##############################################################################
 #### Main
 
+timezone="$(readlink /etc/localtime | sed 's,.*zoneinfo/,,')"
+
 # Force network backup mount (necessary if your TM backups are through the network)
 tmutil listbackups &>/dev/null || true
 
@@ -110,9 +112,9 @@ for mountpoint in "${destinations[@]}"; do
         # Convert from weird format to ISO 8601
         timestamp="$(sed -n 's,.*/\(.*\)\.backup$,\1,p' <<<"$backup" \
             | perl -pe 's/^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})$/$1T$2:$3/')"
-        timestamp_ts="$(TZ=America/Los_Angeles $DATE -d "$timestamp" +%s)"
+        timestamp_ts="$(TZ="$timezone" $DATE -d "$timestamp" +%s)"
         # Remove the `:` between hour and minute to save space
-        timestamp="$(TZ=America/Los_Angeles $DATE -d "$timestamp" +%FT%H%M)"
+        timestamp="$(TZ="$timezone" $DATE -d "$timestamp" +%FT%H%M)"
 
         size="$(tmutil uniquesize "$backup" | awk '{print $1}')"
 
