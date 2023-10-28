@@ -48,7 +48,7 @@ function usage {
     cat <<END >&2
 Usage: $SCRIPT_NAME [-h|--help] [-n NUM | --lines NUM]
         -h | --help : get help
-        -n NUM | --lines NUM : (like \`tail\`) output the last NUM lines for each volume
+        -n NUM | --lines NUM : for each volume, limit to NUM lines
 END
     exit 1
 }
@@ -108,7 +108,10 @@ fi
 
 for mountpoint in "${destinations[@]}"; do
     echo "--- ${mountpoint/\/Volumes\//} ---"
-    (tmutil listbackups -d "$mountpoint" -m || true) | while read -r backup; do
+    (tmutil listbackups -d "$mountpoint" -m || true) \
+    | tail -n "${opt_lines:-99999}" \
+    | tac \
+    | while read -r backup; do
         # Convert from weird format to ISO 8601
         timestamp="$(sed -n 's,.*/\(.*\)\.backup$,\1,p' <<<"$backup" \
             | perl -pe 's/^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})$/$1T$2:$3/')"
@@ -119,6 +122,6 @@ for mountpoint in "${destinations[@]}"; do
         size="$(tmutil uniquesize "$backup" | awk '{print $1}')"
 
         printf "%s %s %7s\n" "$(colored_icon "$timestamp_ts")" "$timestamp" "$size"
-    done | tail -n "${opt_lines:-99999}"
+    done
     echo
 done
