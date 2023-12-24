@@ -46,7 +46,10 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 function usage {
     cat <<END >&2
-Usage: $SCRIPT_NAME [-h|--help] [-n NUM | --lines NUM]
+Usage: $SCRIPT_NAME [-h|--help] [-n NUM | --lines NUM] [mountpoint…]
+
+    Default mountpoints are those listed by \`tmutil destinationinfo\`.
+
         -h | --help : get help
         -n NUM | --lines NUM : for each volume, limit to NUM lines
 END
@@ -70,7 +73,7 @@ done
 
 #### Arguments
 
-[[ $# -eq 0 ]] || usage
+mountpoints=("$@")
 
 ##############################################################################
 #### Util
@@ -98,15 +101,17 @@ timezone="$(readlink /etc/localtime | sed 's,.*zoneinfo/,,')"
 # Force network backup mount (necessary if your TM backups are through the network)
 tmutil listbackups &>/dev/null || true
 
-readarray -t destinations < <(tmutil destinationinfo | sed -n 's/^Mount Point *: *\(.*\)/\1/p')
+if [[ ${#mountpoints[@]} -eq 0 ]]; then
+    readarray -t mountpoints < <(tmutil destinationinfo | sed -n 's/^Mount Point *: *\(.*\)/\1/p')
 
-if [[ -z ${destinations+x} ]]; then
-    printf "No volumes mounted.\n\n"
-    tmutil destinationinfo
-    exit
+    if [[ -z ${mountpoints+x} ]]; then
+        printf "No volumes mounted.\n\n"
+        tmutil destinationinfo
+        exit
+    fi
 fi
 
-for mountpoint in "${destinations[@]}"; do
+for mountpoint in "${mountpoints[@]}"; do
     echo "--- ${mountpoint/\/Volumes\//} ---"
     (tmutil listbackups -d "$mountpoint" -m || true) \
     | tail -n "${opt_lines:-99999}" \
