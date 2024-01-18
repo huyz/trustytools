@@ -18,7 +18,8 @@ if [ $# -eq 0 ]; then
 fi
 
 for i in "$@"; do
-  for j in $(mount | sed -n "s,^\\(/dev/[^ 	]*\\)[ 	][ 	]*on[ 	][ 	]*/Volumes/$i[ 	]*.*,\\1,p"); do
-    hdiutil eject "$j"
-  done
+    for j in $(mount | sed -n "s,^\\(/dev/[^ 	]*\\)[ 	][ 	]*on[ 	][ 	]*/Volumes/${i}[ 	]*.*,\\1,p"); do
+        echo hdiutil eject "$j"
+        hdiutil eject "$j"
+    done
 done
