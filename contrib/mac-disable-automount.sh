@@ -78,7 +78,7 @@ function add_identifier {
 
 for name in "$@"; do
     # Iterate over list of identifiers and volume names from `diskutil info`
-    diskutil list | perl -lne 'print if s/^ *\d+: +(?:.*?(?:[Ss]cheme|Volume)|\w+) +([\w\s-]+?)\s{2,}.*\s(disk.*)/$1|$2/' | while read -r line
+    diskutil list | perl -lne 'print if s/^ *\d+: +(?:.*?(?:[Ss]cheme|Volume|Microsoft Basic Data)|\w+) +([\w\s-]+?)\s{2,}.*\s(disk.*)/$1|$2/' | while read -r line
     do
         # Example of $line:
         #    1: APFS Volume Swiftsure Clone - Data 592.1 GB disk4s1
