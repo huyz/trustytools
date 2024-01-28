@@ -19,34 +19,34 @@ CLEAR_PASSWORD_ONLY=1
 prev_content=
 
 while true; do
-  content="$(pbpaste)"
+    content="$(pbpaste)"
 
-  if [[ -z "$content" ]]; then
-    [[ -n $DEBUG ]] && echo "Nothing. Skipping..." >&2
-    :
+    if [[ -z "$content" ]]; then
+        [[ -n $DEBUG ]] && echo "Nothing. Skipping..." >&2
+        :
 
-  elif [[ "$content" = "$prev_content" ]]; then
-    if (( SECONDS - prev_seconds >= CHECK_INTERVAL )); then
-      [[ -n $DEBUG ]] && echo "Stale. Erasing..." >&2
-      pbcopy </dev/null
-      prev_content=
+    elif [[ "$content" = "$prev_content" ]]; then
+        if ((SECONDS - prev_seconds >= CHECK_INTERVAL)); then
+            [[ -n $DEBUG ]] && echo "Stale. Erasing..." >&2
+            pbcopy < /dev/null
+            prev_content=
+        else
+            [[ -n $DEBUG ]] && echo "Still fresh. Holding..." >&2
+        fi
+
+    elif [[ -z $CLEAR_PASSWORD_ONLY ]]; then
+        [[ -n $DEBUG ]] && echo "New. Storing..." >&2
+        prev_content="$content"
+        prev_seconds=$SECONDS
+
+    elif [[ ${#content} -ge 8 && ${#content} -le 30 && "${content// /}" == "$content" && "$content" != http* ]]; then
+        [[ -n $DEBUG ]] && echo "New password. Storing..." >&2
+        prev_content="$content"
+        prev_seconds=$SECONDS
     else
-      [[ -n $DEBUG ]] && echo "Still fresh. Holding..." >&2
+        [[ -n $DEBUG ]] && echo "New non-password. Skipping..." >&2
+        prev_content=
     fi
 
-  elif [[ -z $CLEAR_PASSWORD_ONLY ]]; then
-    [[ -n $DEBUG ]] && echo "New. Storing..." >&2
-    prev_content="$content"
-    prev_seconds=$SECONDS
-
-  elif [[ ${#content} -ge 8 && ${#content} -le 30 && "$(<<<"$content" sed 's/[[:space:]]//g')" == "$content" && "$content" != http* ]]; then
-    [[ -n $DEBUG ]] && echo "New password. Storing..." >&2
-    prev_content="$content"
-    prev_seconds=$SECONDS
-  else
-    [[ -n $DEBUG ]] && echo "New non-password. Skipping..." >&2
-    prev_content=
-  fi
-
-  sleep 1
+    sleep 1
 done
