@@ -1,4 +1,5 @@
 #!/bin/bash
+# Eject all external, physical drives.
 # Source: https://apple.stackexchange.com/a/394594/6278
 # Prerequisites: brew install terminal-notifier
 
@@ -20,13 +21,12 @@ function notify {
 
 #### Main
 
-#script to eject all external drives
-disks=$(diskutil list external | sed -n '/[Ss]cheme/s/.*B *//p')
+disks=$(diskutil list external physical | sed -n 's/^\([^[:space:]]*\)[[:space:]].*external, physical.*$/\1/p')
 
-if [ "$disks" ]; then
+if [[ -n "$disks" ]]; then
     fail=0
-    while read -r line ; do
-        diskutil eject "/dev/$line" || (( fail++ ))
+    while read -r disk ; do
+        diskutil eject "$disk" || (( fail++ ))
     done <<< "$disks"
     if (( fail > 0 )); then
         notify "❌ Failed to eject $fail disk(s)."
