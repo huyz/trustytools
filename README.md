@@ -32,26 +32,27 @@ useful for everyday use.
 ## Mac folder
 
 
-| Command                           | Description                                                                                                 |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `autoclear-clipboard`             | Automatically clears passwords from clipboard after a brief time (because Universal Clipboard is dangerous) |
-| `bundle-id`                       | Displays the bundle ID of specific application (useful for `terminal-notifier`)                             |
-| `eject`                           | Ejects a removable disk by user-friendly volume name                                                        |
-| `get-bounds-of-mouse-display`     | Displays the bounds of the display where the mouse is                                                       |
-| `is-app-running`                  | Checks if the given application (using macOS friendly name) is running                                      |
-| `list-anytrans-backups`           | Lists all the mobile device backups made by iMobie AnyTrans                                                 |
-| `list-chromium-caches`            | Lists all the Chromium/Electron cache folders and their sizes                                               |
-| `list-installed-electron-apps`    | Lists which of the installed Applications run Electron                                                      |
-| `list-mobilesync-backups`         | Lists all the mobile device backups made by macOS                                                           |
-| `list-processes`                  | Lists running processes as seen from "System Events"                                                        |
-| `list-tm-backups`                 | Lists all the Time Machine backups                                                                          |
-| `mountpoint`                      | Like on linux, checks if a file/dir is a mountpoint                                                         |
-| `port-inactive-safe-to-uninstall` | List inactive MacPorts package versions that have active replacements                                       |
-| `port-uninstall-inactive-safely`  | Uninstalls inactive MacPorts package versions that have active replacements                                 |
-| `quit-app`                        | Closes an application (using macOS friendly name); often works better than `pkill`, e.g. for Google Drive   |
-| `screencap-ocr`                   | Lets you take a screenshot and puts the OCR'd text in your clipboard                                        |
-| `show-dev-sig-of-running-apps`    | Displays Dev Signatures of running apps                                                                     |
-| `unretina`                        | Reduces the resolution of Retina screenshots to regular resolution                                          |
+| Command                           | Description                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `autoclear-clipboard`             | Automatically clears passwords from clipboard after a brief time (because Universal Clipboard is dangerous)   |
+| `bundle-id`                       | Displays the bundle ID of specific application (useful for `terminal-notifier`)                               |
+| `eject`                           | Ejects a removable disk by user-friendly volume name                                                          |
+| `get-bounds-of-mouse-display`     | Displays the bounds of the display where the mouse is                                                         |
+| `is-app-running`                  | Checks if the given application (using macOS friendly name) is running                                        |
+| `list-anytrans-backups`           | Lists all the mobile device backups made by iMobie AnyTrans                                                   |
+| `list-chromium-caches`            | Lists all the Chromium/Electron cache folders and their sizes                                                 |
+| `list-installed-electron-apps`    | Lists which of the installed Applications run Electron                                                        |
+| `list-mobilesync-backups`         | Lists all the mobile device backups made by macOS                                                             |
+| `list-processes`                  | Lists running processes as seen from "System Events"                                                          |
+| `list-tm-backups`                 | Lists all the Time Machine backups                                                                            |
+| `mountpoint`                      | Like on linux, checks if a file/dir is a mountpoint                                                           |
+| `port-inactive-safe-to-uninstall` | List inactive MacPorts package versions that have active replacements                                         |
+| `port-pip-find-packages`          | For the MacPorts Python interpreters, lists all the pip packages and whether they were installed via MacPorts |
+| `port-uninstall-inactive-safely`  | Uninstalls inactive MacPorts package versions that have active replacements                                   |
+| `quit-app`                        | Closes an application (using macOS friendly name); often works better than `pkill`, e.g. for Google Drive     |
+| `screencap-ocr`                   | Lets you take a screenshot and puts the OCR'd text in your clipboard                                          |
+| `show-dev-sig-of-running-apps`    | Displays Dev Signatures of running apps                                                                       |
+| `unretina`                        | Reduces the resolution of Retina screenshots to regular resolution                                            |
 
 ## Contrib folder
 
