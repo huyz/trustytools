@@ -2,8 +2,9 @@
 # Use https://github.com/xbglowx/vault-kv-search to give an interactive TUI
 #   to search recursively through the secrets
 # Usage:
-#   vault-kv-fzf [PREFIX]
-#      PREFIX defaults to 'kv/'
+#   vault-kv-fzf [MOUNT_POINT]
+#      MOUNT_POINT defaults to 'secret/'
+#        (similar to https://docs.ansible.com/ansible/latest/collections/community/hashi_vault/vault_kv2_get_module.html#parameter-engine_mount_point)
 #
 # Prerequisites: vault-kv-search, fzf, jq
 
@@ -45,6 +46,10 @@ if ! command -v jq &>/dev/null; then
     exit 1
 fi
 
+#### Config
+
+DEFAULT_MOUNT_POINT="secret/"
+
 #### Main
 
 if [[ -z "${VAULT_TOKEN:-}" ]]; then
@@ -52,7 +57,7 @@ if [[ -z "${VAULT_TOKEN:-}" ]]; then
     export VAULT_TOKEN
 fi
 
-vault-kv-search --search=path "${1:-kv/}" -r . --json \
+vault-kv-search --search=path "${1:-$DEFAULT_MOUNT_POINT}" -r . --json \
     | jq -r .path \
     | sort -ru \
     | fzf --preview 'vault kv get --format=yaml ${}'
