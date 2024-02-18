@@ -28,6 +28,7 @@ useful for everyday use.
 | `ssh-keygen-l`         | Better listing of private keys (includes comments)                                                                                                                                                                    |
 | `unln`                 | Replaces a symlinked file with a copy so that it can be edited separately                                                                                                                                             |
 | `untar`                | Extracts all or specific files from within a tar archive that's possibly compressed and/or encrypted.<br>Files can be filtered at the command-line and/or interactively. Supports compress, gzip, bzip2, xz, gpg, pgp |
+| `vault-kv-fzf`         | Interactive browser for viewing HashiCorp Vault KV store                                                                                                                                                              |
 
 ## Mac folder
 
