@@ -1,12 +1,16 @@
 #!/bin/bash
 # Use https://github.com/xbglowx/vault-kv-search to give an interactive TUI
 #   to search recursively through the secrets
+#
 # Usage:
 #   vault-kv-fzf [MOUNT_POINT]
 #      MOUNT_POINT defaults to 'secret/'
 #        (similar to https://docs.ansible.com/ansible/latest/collections/community/hashi_vault/vault_kv2_get_module.html#parameter-engine_mount_point)
 #
 # Prerequisites: vault-kv-search, fzf, jq
+#
+# Source: https://github.com/hashicorp/vault/issues/5275#issuecomment-1951402612
+# See for potential speed-up: https://github.com/hashicorp/vault/issues/5275#issuecomment-1951402612
 
 #### Preamble (v2024-01-14)
 
