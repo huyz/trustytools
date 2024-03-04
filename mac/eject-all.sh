@@ -5,9 +5,11 @@
 
 set -euo pipefail
 shopt -s failglob
-trap 'echo "ERR signal on line $(caller)" >&2' ERR
+# shellcheck disable=SC2317
+function trap_err { echo "ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
 trap exit INT
-export PS4='+(BASH_SOURCE:LINENO): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 #### Utils
 
@@ -19,9 +21,14 @@ function notify {
     fi
 }
 
+#### Init
+
+# To find diskutil
+export PATH=/usr/sbin:$PATH
+
 #### Main
 
-disks=$(diskutil list external physical | sed -n 's/^\([^[:space:]]*\)[[:space:]].*external, physical.*$/\1/p')
+disks=$(list external physical | sed -n 's/^\([^[:space:]]*\)[[:space:]].*external, physical.*$/\1/p')
 
 if [[ -n "$disks" ]]; then
     fail=0
