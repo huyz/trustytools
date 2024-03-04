@@ -28,7 +28,7 @@ export PATH=/usr/sbin:$PATH
 
 #### Main
 
-disks=$(list external physical | sed -n 's/^\([^[:space:]]*\)[[:space:]].*external, physical.*$/\1/p')
+disks=$(diskutil list external physical | sed -n 's/^\([^[:space:]]*\)[[:space:]].*external, physical.*$/\1/p')
 
 if [[ -n "$disks" ]]; then
     fail=0
