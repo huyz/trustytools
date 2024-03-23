@@ -30,6 +30,9 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 FSTAB=/etc/fstab
 
+# To find diskutil
+export PATH=/usr/sbin:$PATH
+
 #### Arguments
 
 function usage {
