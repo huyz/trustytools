@@ -50,8 +50,8 @@ if [[ $OSTYPE == darwin* ]]; then
             { echo "$0: Error: \`sudo port install util-linux\` to install $GETOPT." >&2; exit 1; }
         [[ -x "${SED:=/opt/local/bin/gsed}" ]] || \
             { echo "$0: Error: \`sudo port install gsed\` to install $SED." >&2; exit 1; }
-#        [[ -x "${FD:=/opt/local/bin/fd}" ]] || \
-#            { echo "$0: Error: \`sudo port install fd\` to install $FD." >&2; exit 1; }
+        [[ -x "${FZF:=/opt/local/bin/fzf}" ]] || \
+            { echo "$0: Error: \`sudo port install fzf\` to install $FZF." >&2; exit 1; }
         [[ -x "${GH:=/opt/local/bin/gh}" ]] || \
             { echo "$0: Error: \`sudo port install gh\` to install $GH." >&2; exit 1; }
     else
@@ -63,8 +63,8 @@ if [[ $OSTYPE == darwin* ]]; then
             { echo "$0: Error: \`brew install gnu-getopt\` to install $GETOPT." >&2; exit 1; }
         [[ -x "${SED:="$MAC_PREFIX/bin/gsed"}" ]] || \
             { echo "$0: Error: \`brew install gnu-sed\` to install $SED." >&2; exit 1; }
-#        [[ -x "${FD:="$MAC_PREFIX/bin/fd"}" ]] || \
-#            { echo "$0: Error: \`brew install fd\` to install $FD." >&2; exit 1; }
+        [[ -x "${FZF:="$MAC_PREFIX/bin/fzf"}" ]] || \
+            { echo "$0: Error: \`brew install fzf\` to install $FZF." >&2; exit 1; }
         [[ -x "${GH:="$MAC_PREFIX/bin/gh"}" ]] || \
             { echo "$0: Error: \`brew install gh\` to install $GH." >&2; exit 1; }
     fi
@@ -81,7 +81,7 @@ else
 #    TIMEOUT="timeout"
     GETOPT="getopt"
     SED="sed"
-#    FD="fdfind"
+    FZF="fzf"
     [[ -x "${GH:="$HOMEBREW_PREFIX/bin/gh"}" ]] || \
         { echo "$0: Error: \`brew install gh\` to install $GH." >&2; exit 1; }
 fi
@@ -160,7 +160,7 @@ function abort { printf "$SCRIPT_NAME: FATAL: %s\n" "$@" >&2; exit 1; }
 
 if [[ -z $opt_upstream ]]; then
     # Check if gh knows what the default repo is
-    default_repo="$(gh repo set-default --view)"
+    default_repo="$($GH repo set-default --view)"
 
     if [[ -n "${default_repo}" ]]; then
         # gh will fill in these template values
@@ -191,7 +191,9 @@ repo="${repo%.git}"
 
 echo "𐄫 Fetching forks of $owner/$repo"
 echo
-echo "TIP: results stream in as batches. Be patient…"
+echo "TIP: results stream in batches. Wait longer for more results…"
+echo
+
 # Give some time for the user to know to wait for results
 sleep 2
 
@@ -202,10 +204,10 @@ sleep 2
 #   - don't include column 3 in the preview
 #   - sort in reverse order (most recently pushed at the bottom)
 # Redirect selection to the fifo; background so we don't block.
-gh api --paginate "repos/$owner/$repo/forks" \
+$GH api --paginate "repos/$owner/$repo/forks" \
     --jq '[ .[] ] | sort_by(.pushed_at) | reverse' \
     | jq -r '.[] | "\(.pushed_at) \(.owner.login) \(.clone_url)"' \
-    | fzf --with-nth=1,2 --multi \
+    | $FZF --with-nth=1,2 --multi \
         --bind 'ctrl-a:select-all' \
         --bind 'ctrl-t:toggle-all' \
         --header "(Shift+)Tab select  ^A all  ^T invert selection   ${_FZF_DEFAULT_HEADER:-}" \
