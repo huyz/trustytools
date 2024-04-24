@@ -20,11 +20,6 @@
 # - you're looking at public forks of that repo
 # - you want to add a remote to your local checkout for one of the forks
 
-##############################################################################
-# Script-wide block: this may allow updating the script as it's running (if under 8KB).
-# But trap_err won't show the right line number.
-{
-
 # When debugging
 #set -x
 
@@ -217,8 +212,3 @@ $GH api --paginate "repos/$owner/$repo/forks" \
         # `|| true` because we want to continue even if a remote is already there
         run_cmd $GIT remote add ${opt_tags:-} "$FORK_OWNER" "$FORK_CLONE_URL" || true
     done
-
-##############################################################################
-# end of script-wide block
-exit
-}
