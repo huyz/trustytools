@@ -178,8 +178,8 @@ if [[ -z "${owner:-}" || -z "${repo:-}" ]]; then
     [[ -n "$url" ]] || abort "url is not set for remote \"$remote\" in git config"
 
     REGEX='^((git\+)?(https?|ssh|git)://[^/]+/|git@[^:]+:)([^/]+)/([^/]+).*'
-    owner="$($GIT config remote.$remote.url | $SED -nE "s,$REGEX,\4,p")"
-    repo="$($GIT config remote.$remote.url  | $SED -nE "s,$REGEX,\5,p")"
+    owner="$(<<<"$url" $SED -nE "s,$REGEX,\4,p")"
+    repo="$( <<<"$url" $SED -nE "s,$REGEX,\5,p")"
 
     [[ -n "$owner" && -n "$repo" ]] || abort "Could not determine $remote owner and repo"
 fi
