@@ -155,7 +155,7 @@ function abort { printf "$SCRIPT_NAME: FATAL: %s\n" "$@" >&2; exit 1; }
 
 if [[ -z $opt_upstream ]]; then
     # Check if gh knows what the default repo is
-    default_repo="$($GH repo set-default --view)"
+    default_repo="$($GH repo set-default --view 2>/dev/null || true)"
 
     if [[ -n "${default_repo}" ]]; then
         # gh will fill in these template values
