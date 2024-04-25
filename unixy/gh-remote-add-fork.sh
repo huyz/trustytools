@@ -170,7 +170,7 @@ if [[ -z "${owner:-}" || -z "${repo:-}" ]]; then
     [[ -n "$opt_upstream" ]] && remote=upstream
 
     url="$($GIT config remote.$remote.url || true)"
-    [[ -n "$url" ]] || abort "url is not set for remote \"$remote\" in git config"
+    [[ -n "$url" ]] || abort "No \`$remote\` remote configured in git config."
 
     REGEX='^((git\+)?(https?|ssh|git)://[^/]+/|git@[^:]+:)([^/]+)/([^/]+).*'
     owner="$(<<<"$url" $SED -nE "s,$REGEX,\4,p")"
@@ -206,9 +206,9 @@ $GH api --paginate "repos/$owner/$repo/forks" \
         --bind 'ctrl-a:select-all' \
         --bind 'ctrl-t:toggle-all' \
         --header "(Shift+)Tab select  ^A all  ^T invert selection   ${_FZF_DEFAULT_HEADER:-}" \
-    | while read -r _ FORK_OWNER FORK_CLONE_URL; do
-        [[ -n "$FORK_OWNER" && -n "$FORK_CLONE_URL" ]] || continue
-        echo "𐄬 Adding remote ${FORK_OWNER} …"
+    | while read -r _ fork_owner fork_clone_url; do
+        [[ -n "$fork_owner" && -n "$fork_clone_url" ]] || continue
+        echo "𐄬 Adding remote ${fork_owner} …"
         # `|| true` because we want to continue even if a remote is already there
-        run_cmd $GIT remote add ${opt_tags:-} "$FORK_OWNER" "$FORK_CLONE_URL" || true
+        run_cmd $GIT remote add ${opt_tags:-} "$fork_owner" "$fork_clone_url" || true
     done
