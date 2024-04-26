@@ -1,4 +1,9 @@
 #!/bin/bash
+# 2024-04-26 Deprecated. Many alternatives:
+# - https://github.com/garabik/grc
+# - https://github.com/dandavison/delta
+# - https://github.com/Wilfred/difftastic
+#
 # Wrapper for diff to add colors both at the line and word level:
 # - colordiff colors the line differences
 # - git's diff-highlight colors the hunks within the line differences
