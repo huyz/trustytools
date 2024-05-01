@@ -236,6 +236,7 @@ else
                 continue 2
             fi
         done
+        # Order of files: Incoming Previous_changes Base Result
         run_cmd code --merge "${MAPFILE[1]}/$name" "$PREVIOUS_CONFIG_DIR/$name" "${MAPFILE[0]}/$name" "$CURRENT_CONFIG_DIR/$name"
     done
 fi
