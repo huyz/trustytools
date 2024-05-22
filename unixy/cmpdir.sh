@@ -134,10 +134,11 @@ exec &> >(tee "$tmpfile")
 ### Execute
 
 set -x
-exec rsync -ni -aH \
+exec rsync --dry-run --itemize-changes -aH \
     ${opt_checksum:+"$opt_checksum"} \
     ${opt_delete:+"$opt_delete"} \
     --info=progress2 \
+    --exclude='.DS_Store' \
     --exclude='.git' \
     --exclude='.idea' \
     --exclude='.mypy_cache' \
