@@ -66,6 +66,7 @@ Other folks' scripts found here and there.
 | `git-quote-string-multiline` | Helper for creating complex git aliases, in particular quoting special characters                                                                            |
 | `ip2geo`                     | Given a hostname or IP address, spits out city, state, country {From [commandlinefu.com](http://commandlinefu.com)}                                          |
 | `mac-disable-automount`      | Disables the automounting of specified volumes on macOS                                                                                                      |
+| `mac-get-focus-mode`         | On macOS, Outputs the current "Focus" mode                                                                                                                   |
 | `netls`                      | Graphs the number of connections for each connected remote host {From [commandlinefu.com](http://commandlinefu.com)}                                         |
 | `relink`                     | Relinks symbolic links by perl regular expression on the paths of the links' targets.                                                                        |
 | `rgf`                        | ripgrep-fzf combo {From [fzf](https://github.com/junegunn/fzf/blob/master/ADVANCED.md#switching-between-ripgrep-mode-and-fzf-mode)}                          |
