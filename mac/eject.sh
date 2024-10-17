@@ -1,4 +1,6 @@
 #!/bin/bash
+# Ejects volumes, including physical volumes and disk images.
+#
 # Usage: eject [-a] VOLUME…
 #   -a to eject all the other volumes on the same physical disks of the specified VOLUMEs
 
