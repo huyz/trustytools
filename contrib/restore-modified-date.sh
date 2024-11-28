@@ -220,8 +220,8 @@ while IFS= read -r file; do
     fi
 
     echo
-done \
-    < <(set -e; cd "$targetDir"; find . -type d)
+done < <(set -e; cd "$targetDir"; find . -depth -type d)
+
 
 echo
 echo "𐄫 SUMMARY:"
