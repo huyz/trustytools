@@ -198,7 +198,7 @@ found=0
 notfound=0
 changed=0
 
-while read -r file; do
+while IFS= read -r file; do
     echo "𐄬 $file"
     targetFileCreation=$(GetFileInfo -d "$targetDir/$file")
     targetFileModification=$(GetFileInfo -m "$targetDir/$file")
@@ -216,7 +216,7 @@ while read -r file; do
         fi
     else
         ((notfound++))
-        echo "🔴 Not in backup dir  ! ─┘"
+        echo "🔴 Not in backup dir!   ─┘"
     fi
 
     echo
