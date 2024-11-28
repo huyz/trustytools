@@ -33,36 +33,18 @@ if [[ $OSTYPE == darwin* ]]; then
         MAC_PREFIX=/opt/local
         [[ -x "${GETOPT:="$MAC_PREFIX/bin/getopt"}" ]] || \
             { echo "$0: ERROR: \`$_install_cmd util-linux\` to install $GETOPT." >&2; exit 1; }
-#        [[ -x "${SED:="$MAC_PREFIX/bin/gsed"}" ]] || \
-#            { echo "$0: ERROR: \`$_install_cmd gsed\` to install $SED." >&2; exit 1; }
     else
         HOMEBREW_PREFIX="$( (/opt/homebrew/bin/brew --prefix || /usr/local/bin/brew --prefix || brew --prefix) 2>/dev/null)"
         MAC_PREFIX="$HOMEBREW_PREFIX"
         [[ -x "${GETOPT:="$MAC_PREFIX/opt/gnu-getopt/bin/getopt"}" ]] || \
             { echo "$0: ERROR: \`$_install_cmd gnu-getopt\` to install $GETOPT." >&2; exit 1; }
-#        [[ -x "${SED:="$MAC_PREFIX/bin/gsed"}" ]] || \
-#            { echo "$0: ERROR: \`$_install_cmd gnu-sed\` to install $SED." >&2; exit 1; }
     fi
     [[ -x "${REALPATH:="$MAC_PREFIX/bin/grealpath"}" ]] || \
         { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $REALPATH." >&2; exit 1; }
-#    READLINK="greadlink" # also coreutils
-#    DATE="gdate"         # also coreutils
-#    STAT="gstat"         # also coreutils
-#    TIMEOUT="gtimeout"   # also coreutils
-#    [[ -x "${FD:="$MAC_PREFIX/bin/fd"}" ]] || \
-#        { echo "$0: ERROR: \`$_install_cmd fd\` to install $FD." >&2; exit 1; }
 else
     HOMEBREW_PREFIX="$( (/home/linuxbrew/.linuxbrew/bin/brew --prefix || brew --prefix) 2>/dev/null)"
     GETOPT="getopt"
     REALPATH="realpath"
-#    READLINK="readlink"
-#    DATE="date"
-#    STAT="stat"
-#    TIMEOUT="timeout"
-#    SED="sed"
-    FD="fdfind"
-    [[ -x "${FD:="$HOMEBREW_PREFIX/bin/fd"}" ]] || \
-        { echo "$0: ERROR: \`$_install_cmd fd\` to install $FD." >&2; exit 1; }
 fi
 
 # shellcheck disable=SC2034
@@ -120,44 +102,6 @@ fi
 
 backupDir="$1"
 targetDir="$2"
-
-#### Terminal colors
-
-#declare bold='' underline='' standout='' normal='' black='' red='' green='' yellow='' blue='' magenta='' cyan='' white=''
-#if [[ -t 1 ]]; then # if terminal
-#    ncolors="$(which tput > /dev/null && tput colors)" # supports color
-#    if test -n "$ncolors" && test "$ncolors" -ge 8; then
-#        termcols=$(tput cols) bold="$(tput bold)" underline="$(tput smul)" standout="$(tput smso)" normal="$(tput sgr0)" black="$(tput setaf 0)" red="$(tput setaf 1)" green="$(tput setaf 2)" yellow="$(tput setaf 3)" blue="$(tput setaf 4)" magenta="$(tput setaf 5)" cyan="$(tput setaf 6)" white="$(tput setaf 7)"
-#    fi
-#fi
-
-#### Utils
-
-# shellcheck disable=SC2120,SC2317
-function indent_stdout {
-    local prefix=
-    [[ $# -gt 0 &&${1:-} == -p ]] && { prefix="$2"; shift 2; }
-    perl -pe "s/^/${prefix}░░░░/"
-}
-# shellcheck disable=SC2120,SC2317
-function indent_stderr {
-    local prefix=
-    [[ ${1:-} == -p ]] && { prefix="$2"; shift 2; }
-    perl -ne "s/^/${prefix}░░░░/; print STDERR"
-}
-
-# shellcheck disable=SC2059,SC2317
-function run_cmd {
-    [[ -z ${opt_verbose-} ]] || printf "#❯%s\n" "$(printf " %q" "$@")" || true
-    [[ -n ${opt_dry_run-} ]] || "$@"
-}
-
-# shellcheck disable=SC2317
-function warn { printf "$SCRIPT_NAME: WARNING: %s\n" "$@" >&2; }
-# shellcheck disable=SC2317
-function err { printf "$SCRIPT_NAME: ERROR: %s\n" "$@" >&2; }
-# shellcheck disable=SC2317
-function abort { printf "$SCRIPT_NAME: ERROR: %s\n" "$@" >&2; exit 1; }
 
 
 ##############################################################################
