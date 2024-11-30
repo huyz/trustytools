@@ -41,10 +41,16 @@ if [[ $OSTYPE == darwin* ]]; then
     fi
     [[ -x "${REALPATH:="$MAC_PREFIX/bin/grealpath"}" ]] || \
         { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $REALPATH." >&2; exit 1; }
+    DATE="gdate"
+    STAT="gstat"
+    TOUCH="gtouch"
 else
     HOMEBREW_PREFIX="$( (/home/linuxbrew/.linuxbrew/bin/brew --prefix || brew --prefix) 2>/dev/null)"
     GETOPT="getopt"
     REALPATH="realpath"
+    DATE="date"
+    STAT="stat"
+    TOUCH="touch"
 fi
 
 # shellcheck disable=SC2034
@@ -61,16 +67,18 @@ SCRIPT_DIR="$(dirname "$SCRIPT")"
 # Defaults
 opt_dry_run=
 opt_verbose=
+opt_after=
+opt_before=
 #opt_argument=default
 
 function usage {
-#Usage: $SCRIPT_NAME [-h|--help] [-n|--dry-run] [-v|--verbose] [-a value|--argument value] [file...]
-#        -a value|--argument value: pass value to the argument option (default $opt_argument)
     cat <<END >&2
-Usage: $SCRIPT_NAME [-h|--help] [-n|--dry-run] [-v|--verbose] BACKUP_DIR TARGET_DIR
+Usage: $SCRIPT_NAME [-h|--help] [-n|--dry-run] [-v|--verbose] [-a date|--after date] [-b date|--before date] BACKUP_DIR TARGET_DIR
         -h|--help: get help
         -n|--dry-run: simulate write actions as much as possible
         -v|--verbose: turn on verbose mode
+        -a|--after:  only update files whose modification dates are newer than this time, inclusive
+        -b|--before: only update files whose modification dates are older than this time, inclusive
 
     Loops through all subdirectories of TARGET_DIR, inclusively.
     For each subdir in TARGET_DIR, seeks a corresponding subdir in BACKUP_DIR.
@@ -81,8 +89,7 @@ END
     exit 1
 }
 
-#opts=$($GETOPT --options hnva: --long help,dry-run,verbose,argument: --name "$SCRIPT_NAME" -- "$@") || usage
-opts=$($GETOPT --options hnv --long help,dry-run,verbose --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$($GETOPT --options hnva:b: --long help,dry-run,verbose,after:,before: --name "$SCRIPT_NAME" -- "$@") || usage
 eval set -- "$opts"
 
 while true; do
@@ -90,11 +97,26 @@ while true; do
         -h | --help) usage ;;
         -n | --dry-run) opt_dry_run=opt_dry_run; shift ;;
         -v | --verbose) opt_verbose=opt_verbose; shift ;;
-        #-a | --argument) opt_argument="$2"; shift 2 ;;
+        -a | --after) opt_after="$2"; shift 2 ;;
+        -b | --before) opt_before="$2"; shift 2 ;;
         --) shift; break ;;
         *) echo "$SCRIPT_NAME: INTERNAL ERROR: '$1'" >&2; exit 1 ;;
     esac
 done
+
+if [[ -n $opt_after ]]; then
+    if ! opt_after_ts="$($DATE --date="$opt_after" '+%s')"; then
+        #echo "$SCRIPT_NAME: ERROR: invalid 'after' date '$opt_after'" >&2
+        exit 1
+    fi
+fi
+if [[ -n $opt_before ]]; then
+    if ! opt_before_ts="$($DATE --date="$opt_before" '+%s')"; then
+        #echo "$SCRIPT_NAME: ERROR: invalid 'before' date '$opt_before'" >&2
+        exit 1
+    fi
+fi
+
 
 if [[ $# -ne 2 ]]; then
     usage
@@ -103,6 +125,11 @@ fi
 backupDir="$1"
 targetDir="$2"
 
+# shellcheck disable=SC2059,SC2317
+function run_cmd {
+    [[ -z ${opt_verbose-} ]] || printf "#❯%s\n" "$(printf " %q" "$@")" || true
+    [[ -n ${opt_dry_run-} ]] || "$@"
+}
 
 ##############################################################################
 #### Init
@@ -143,18 +170,37 @@ notfound=0
 changed=0
 
 while IFS= read -r file; do
+    targetFileCreation="$($STAT --format '%w' "$targetDir/$file")"
+    targetFileModification="$($STAT --format '%y' "$targetDir/$file")"
+    targetFileModificationTS="$($DATE --date="$targetFileModification" '+%s')"
+
+    if [[ -n ${opt_after_ts:-} && "$targetFileModificationTS" -lt "$opt_after_ts" ]]; then
+        if [[ -n $opt_verbose ]]; then
+            echo "𐄬 $file"
+            echo "   skipped because modification date is before $opt_after" >&2
+            echo
+        fi
+        continue
+    fi
+    if [[ -n ${opt_before_ts:-} && "$targetFileModificationTS" -gt "$opt_before_ts" ]]; then
+        if [[ -n $opt_verbose ]]; then
+            echo "𐄬 $file"
+            echo "   skipped because modification date is after $opt_before" >&2
+            echo
+        fi
+        continue
+    fi
+
     echo "𐄬 $file"
-    targetFileCreation=$(GetFileInfo -d "$targetDir/$file")
-    targetFileModification=$(GetFileInfo -m "$targetDir/$file")
     echo "   $targetFileCreation creation"
     echo "   $targetFileModification ───┐"
     if [[ -e "$backupDir/$file" ]] ; then
         ((found++))
-        backupFileModification=$(GetFileInfo -m "$backupDir/$file")
+        backupFileModification=$($STAT --format '%y' "$backupDir/$file")
         if [[ "$backupFileModification" == "$targetFileModification" ]] ; then
             echo "🟢 $backupFileModification √ ─┘"
         else
-            run_cmd SetFile -m "$backupFileModification" "$targetDir/$file"
+            run_cmd $TOUCH -m --reference="$backupDir/$file" "$targetDir/$file"
             ((changed++))
             echo "🟡 $backupFileModification ≠  └───> Restored from backup ✅"
         fi
