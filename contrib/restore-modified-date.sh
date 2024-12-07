@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Undoes the damage that chkbit did to the modification dates of directories:
 # restores the modification dates of directories from backup.
 
@@ -15,8 +15,8 @@
 #[ "${EUID:-$UID}" -eq 0 ] || exec sudo -p '[sudo] password for %u: ' -H "$BASH" "$0" "$@"
 #[ "${EUID:-$UID}" -eq 0 ] || { echo "${BASH_SOURCE[0]}: ERROR: must be run as root" >&2; exit 1; }
 
-# Check for bash 4 for `readarray`
-#[ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
+# Check for bash 4 for associative array
+[ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
 
 set -euo pipefail
 shopt -s failglob
@@ -69,16 +69,25 @@ opt_dry_run=
 opt_verbose=
 opt_after=
 opt_before=
+opt_lookup_prefix=
 #opt_argument=default
 
 function usage {
     cat <<END >&2
 Usage: $SCRIPT_NAME [-h|--help] [-n|--dry-run] [-v|--verbose] [-a date|--after date] [-b date|--before date] BACKUP_DIR TARGET_DIR
+Usage: $SCRIPT_NAME [-h|--help] [-n|--dry-run] [-v|--verbose] [-a date|--after date] [-b date|--before date] [-l prefix|--lookup-prefix prefix] LOOKUP_FILE TARGET_DIR
         -h|--help: get help
         -n|--dry-run: simulate write actions as much as possible
         -v|--verbose: turn on verbose mode
         -a|--after:  only update files whose modification dates are newer than this time, inclusive
         -b|--before: only update files whose modification dates are older than this time, inclusive
+        -l|--lookup-prefix: instead of a BACKUP_DIR, treat first argument as a LOOKUP_FILE
+            containing lines of the form "path|datestamp" where every path will be read in with
+            the specified prefix stripped. Example:
+                -l Pictures lookup.txt
+            will read the lookup.txt file such that a line containing:
+                Pictures/IMG_0123.JPG|03/29/2013 18:59:04
+            means that the file ./IMG_0123.JPG should have modification date "03/29/2013 18:59:04"
 
     Loops through all subdirectories of TARGET_DIR, inclusively.
     For each subdir in TARGET_DIR, seeks a corresponding subdir in BACKUP_DIR.
@@ -89,7 +98,7 @@ END
     exit 1
 }
 
-opts=$($GETOPT --options hnva:b: --long help,dry-run,verbose,after:,before: --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$($GETOPT --options hnva:b:l: --long help,dry-run,verbose,after:,before:,lookup-prefix: --name "$SCRIPT_NAME" -- "$@") || usage
 eval set -- "$opts"
 
 while true; do
@@ -99,6 +108,7 @@ while true; do
         -v | --verbose) opt_verbose=opt_verbose; shift ;;
         -a | --after) opt_after="$2"; shift 2 ;;
         -b | --before) opt_before="$2"; shift 2 ;;
+        -l | --lookup-prefix) opt_lookup_prefix="$2"; shift 2 ;;
         --) shift; break ;;
         *) echo "$SCRIPT_NAME: INTERNAL ERROR: '$1'" >&2; exit 1 ;;
     esac
@@ -117,12 +127,24 @@ if [[ -n $opt_before ]]; then
     fi
 fi
 
-
 if [[ $# -ne 2 ]]; then
     usage
 fi
 
-backupDir="$1"
+if [[ -n $opt_lookup_prefix ]]; then
+    opt_lookup_prefix="${opt_lookup_prefix%%/}"
+    lookupFile="$1"
+    if [[ ! -r "$lookupFile" ]]; then
+        echo "$SCRIPT_NAME: ERROR: Can't read LOOKUP_FILE $lookupFile" >&2
+        exit 1
+    fi
+else
+    backupDir="$1"
+    if [[ ! -d "$backupDir" ]]; then
+        echo "$SCRIPT_NAME: ERROR: No directory at BACKUP_DIR $backupDir" >&2
+        exit 1
+    fi
+fi
 targetDir="$2"
 
 # shellcheck disable=SC2059,SC2317
@@ -133,11 +155,6 @@ function run_cmd {
 
 ##############################################################################
 #### Init
-
-if [[ ! -d "$backupDir" ]]; then
-    echo "$SCRIPT_NAME: ERROR: No directory at BACKUP_DIR $backupDir" >&2
-    exit 1
-fi
 
 if [[ ! -d "$targetDir" ]]; then
     echo "$SCRIPT_NAME: ERROR: No directory at TARGET_DIR $targetDir" >&2
@@ -163,11 +180,23 @@ echo "  🟡 Backup's moddate differs. --> Target moddate is restored from backu
 echo "  🔴 Backup file not found."
 echo
 
+if [[ -n "$opt_lookup_prefix" ]]; then
+    # Create an associative array for quick data lookup
+    declare -A lookup
+
+    echo "𐄫 READING lookup file ${lookupFile}…"
+    while IFS='|' read -r path date; do
+        path="${path#"$opt_lookup_prefix"/}"
+        lookup["$path"]="$date"
+    done < "$lookupFile"
+    echo
+fi
+
 echo "𐄫 PROCESSING…"
 echo
-found=0
-notfound=0
-changed=0
+found_count=0
+unfound_count=0
+changed_count=0
 
 while IFS= read -r file; do
     targetFileCreation="$($STAT --format '%w' "$targetDir/$file")"
@@ -194,18 +223,32 @@ while IFS= read -r file; do
     echo "𐄬 $file"
     echo "   $targetFileCreation creation"
     echo "   $targetFileModification ───┐"
-    if [[ -e "$backupDir/$file" ]] ; then
-        ((found++))
-        backupFileModification=$($STAT --format '%y' "$backupDir/$file")
-        if [[ "$backupFileModification" == "$targetFileModification" ]] ; then
+
+    file="${file#./}"
+    backupFileModificationTS=
+    if [[ -n "$opt_lookup_prefix" ]]; then
+        if [[ -n "${lookup["$file"]:-}" ]]; then
+            backupFileModification="${lookup["$file"]}"
+            backupFileModificationTS="$($DATE --date="$backupFileModification" '+%s')"
+        fi
+    else
+        if [[ -e "$backupDir/$file" ]]; then
+            backupFileModification=$($STAT --format '%y' "$backupDir/$file")
+            backupFileModificationTS="$($DATE --date="$backupFileModification" '+%s')"
+        fi
+    fi
+
+    if [[ -n "$backupFileModificationTS" ]]; then
+        ((++found_count))
+        if [[ "$backupFileModificationTS" == "$targetFileModificationTS" ]] ; then
             echo "🟢 $backupFileModification √ ─┘"
         else
-            run_cmd $TOUCH -m --reference="$backupDir/$file" "$targetDir/$file"
-            ((changed++))
+            run_cmd $TOUCH -m --date="$backupFileModification" "$targetDir/$file"
+            ((++changed_count))
             echo "🟡 $backupFileModification ≠  └───> Restored from backup ✅"
         fi
     else
-        ((notfound++))
+        ((++unfound_count))
         echo "🔴 Not in backup dir!   ─┘"
     fi
 
@@ -216,6 +259,6 @@ done < <(set -e; cd "$targetDir"; find . -depth -type d)
 echo
 echo "𐄫 SUMMARY:"
 echo
-echo "  Not found: $notfound"
-echo "  Found: $found"
-echo "  Changed: $changed"
+echo "  Unfound: $unfound_count"
+echo "  Found:   $found_count"
+echo "  Changed: $changed_count"
