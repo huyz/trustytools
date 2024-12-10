@@ -120,8 +120,12 @@ function symlink {
             return 0
         fi
     elif [[ -e "$link_name" ]]; then
-        echo "$SCRIPT_NAME: error: $link_name already exists" >&2
-        return 1
+        if [[ -z $opt_force ]]; then
+            echo "$SCRIPT_NAME: error: non-symlink $link_name already exists" >&2
+            return 1
+        else
+            echo "$SCRIPT_NAME: warning: non-symlink $link_name already exists. Overwriting…" >&2
+        fi
     fi
 
     echo ln -s$opt_force "$1" "$2"
