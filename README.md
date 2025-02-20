@@ -56,6 +56,7 @@ useful for everyday use.
 | `screencap-ocr`                   | Lets you take a screenshot and puts the OCR'd text in your clipboard                                                                                       |
 | `show-dev-sig-of-running-apps`    | Displays Dev Signatures of running apps                                                                                                                    |
 | `unretina`                        | Reduces the resolution of Retina screenshots to regular resolution                                                                                         |
+| `window-layout-save`              | Saves the current window positions and sizes of all open applications into a new AppleScript script which can be used to restore the window positions.     |
 
 ## Contrib folder
 
