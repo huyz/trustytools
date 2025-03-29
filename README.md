@@ -79,3 +79,4 @@ Other folks' scripts found here and there.
 | `restore-modified-date`      | Restores the modified date of subdirectories from backup                                                                                                     |
 | `wp`                         | Quickly queries Wikipedia (over DNS!) {From [commandlinefu.com](http://commandlinefu.com)}                                                                   |
 | `wrap-in-pty`                | Wrap a command invocation in PTY (so that the command doesn't act any differently than in an interactive terminal)                                           |
+| `wifi-password`              | For macOS, get password of current Wi-Fi connection                                                                                                          |
