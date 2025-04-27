@@ -10,6 +10,7 @@
 #      in a new `default-config-<VERSION_NUMBER>/` subdirectory
 #   3. Create symlinks from the app's config directory to the corresponding files
 #      (or subdirectories) in `.config-history/current-config/`
+#      (e.g. `ln -s .config-history/current-config/kitty.conf ~/.config/kitty.config`)
 #   3a. If you want to work on one or a few config files with fixed filenames,
 #      have VS Code installed. (E.g. kitty only has kitty.conf)
 #   3b. If you want to work on a directory of files (where files come and go)
