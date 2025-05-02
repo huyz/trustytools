@@ -3,6 +3,9 @@
 # which can be used to restore the window positions.
 # Tries to be smart about matching on window name prefixes (IDEs), profile names (browsers),
 # and window numbers (terminals)
+#
+# FIXME:
+# - 2025-03-03 System Events got an error: Can’t get window "Tor Browser" of application process "firefox".
 
 -- For sorting using AppleScriptObjC
 use AppleScript version "2.5"

@@ -64,7 +64,7 @@ Other folks' scripts found here and there.
 
 | Command                      | Description                                                                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `fzf-passage`                | Quick picker for [passage](https://github.com/FiloSottile/passage)                                                                                          |
+| `fzf-passage`                | Quick picker for [passage](https://github.com/FiloSottile/passage)                                                                                           |
 | `git-quote-string-multiline` | Helper for creating complex git aliases, in particular quoting special characters                                                                            |
 | `ip2geo`                     | Given a hostname or IP address, spits out city, state, country {From [commandlinefu.com](http://commandlinefu.com)}                                          |
 | `mac-disable-automount`      | Disables the automounting of specified volumes on macOS                                                                                                      |
