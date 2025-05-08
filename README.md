@@ -77,6 +77,7 @@ Other folks' scripts found here and there.
 | `timed-choice`               | Prompts user with several choices, but times out with a default after the specified number of seconds {By [Eugene Spafford](http://spaf.cerias.purdue.edu/)} |
 | `mailtrim`                   | Trim a standard Unix mbox file to the most recent specified number of messages {By [Michael Soulier](http://identi.ca/msoulier)}                             |
 | `restore-modified-date`      | Restores the modified date of subdirectories from backup                                                                                                     |
+| `urls-to-netscape-bookmarks` | Convert a list of URLs to Netscape bookmarks file format                                                                                                     |
 | `wp`                         | Quickly queries Wikipedia (over DNS!) {From [commandlinefu.com](http://commandlinefu.com)}                                                                   |
 | `wrap-in-pty`                | Wrap a command invocation in PTY (so that the command doesn't act any differently than in an interactive terminal)                                           |
 | `wifi-password`              | For macOS, get password of current Wi-Fi connection                                                                                                          |
