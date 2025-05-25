@@ -7,7 +7,9 @@
 #   1. In the given app's config directory, create a `.config-history/` subdirectory
 #   2. In that subdirectory create a `save-default-config` executable script that
 #      figures out the app's current version and then writes the config files
-#      in a new `default-config-<VERSION_NUMBER>/` subdirectory
+#      in a new `default-config-<VERSION_NUMBER>/` subdirectory.
+#      Run the script
+#   3. `cp -a default-config-<VERSION_NUMBER> current-config`
 #   3. Create symlinks from the app's config directory to the corresponding files
 #      (or subdirectories) in `.config-history/current-config/`
 #      (e.g. `ln -s .config-history/current-config/kitty.conf ~/.config/kitty.config`)
@@ -207,7 +209,7 @@ fi
 mapfile -t < <(find . -name 'default-config-*' | sort -V | tail -2)
 
 if [[ ${#MAPFILE[@]} -ne 2 ]]; then
-    abort "expected 2 default configs, found ${#MAPFILE[@]}."
+    abort "expected 2 default configs, found ${#MAPFILE[@]}. Wait until there's a new version…"
 fi
 
 # Save current-config to previous-config

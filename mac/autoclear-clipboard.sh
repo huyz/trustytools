@@ -36,8 +36,9 @@ trap trap_err ERR
 trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
+##############################################################################
 
-### Config
+#### Config
 
 DEBUG=
 
@@ -50,7 +51,7 @@ CHECK_INTERVAL=12
 # with http
 CLEAR_PASSWORD_ONLY=1
 
-### End of Config
+#### Main
 
 prev_content=
 
