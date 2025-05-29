@@ -121,10 +121,10 @@ function symlink {
         fi
     elif [[ -e "$link_name" ]]; then
         if [[ -z $opt_force ]]; then
-            echo "$SCRIPT_NAME: error: non-symlink $link_name already exists" >&2
+            echo "$SCRIPT_NAME: error: non-symlink $link_name already exists, so can't symlink to $target" >&2
             return 1
         else
-            echo "$SCRIPT_NAME: warning: non-symlink $link_name already exists. Overwriting…" >&2
+            echo "$SCRIPT_NAME: warning: non-symlink $link_name already exists. Overwriting by symlinking to ${target}…" >&2
         fi
     fi
 
