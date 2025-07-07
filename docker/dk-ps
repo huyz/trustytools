@@ -1,0 +1,5 @@
+#!/bin/bash
+# shellcheck shell=bash
+# List the running Docker containers
+
+exec docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.ID}}" "$@"

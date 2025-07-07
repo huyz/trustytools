@@ -1,0 +1,63 @@
+#!/bin/bash
+# shellcheck shell=bash
+# A helper function to loop through Docker Compose projects and invoke commands,
+# setting the environment variable $DKC_PROJ_DIR to the project directory through
+# each iteration.
+# If no project is specified, defaults to the current directory if it's a project directory;
+# otherwise, prompts the user.
+
+#### Preamble (v2025-02-09)
+
+set -euo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Main
+
+usage() {
+    echo "Usage: $SCRIPT_NAME [compose_project…] -- command [arg…]"
+    echo "  Loops through the specified docker compose projects and invokes the command."
+    echo "  If no arguments, defaults to the current directory if it's a project."
+    echo "  Otherwise, prompts to select a project from the list."
+}
+
+if [[ "${1:-}" == '--help' || "${1:-}" == '-h' ]]; then
+    usage
+    exit 0
+elif [[ $# -lt 2 ]]; then
+    usage
+    exit 1
+fi
+
+dirs=()
+while [[ $# -gt 0 ]]; do
+    [[ "$1" == '--' ]] && break
+    dirs+=("$(dkc-get-proj-dir "$1")")
+    shift
+done
+
+if [[ "${1:-}" != '--' || $# -lt 2 ]]; then
+    echo "$SCRIPT_NAME: ERROR: Expected '--' before command." >&2
+    usage
+    exit 1
+fi
+shift
+cmd=("$@")
+
+for i in "${dirs[@]:-$(dkc-get-proj-dir)}"; do
+    DKC_PROJ_DIR="$i" "${cmd[@]}"
+done

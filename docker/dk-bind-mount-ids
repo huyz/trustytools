@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Lists the mappings from bind mount names to Docker-internal IDs
+# NOTE: this doesn't catch bind mounts that may be created by short-lived containers
+
+#### Preamble (v2025-02-09)
+
+set -eo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Checks
+
+if [[ "${OS_RELEASE:-}" != *WSL* ]]; then
+    echo "$SCRIPT_NAME: ERROR: this script is designed for WSL environments only." >&2
+    exit 1
+fi
+
+#### Config
+
+SRV_ROOT=/srv
+BIND_ROOT="/mnt/wsl/docker-desktop-bind-mounts/Ubuntu"
+
+#### Main
+
+
+(
+    # Careful about unsetting items of this map in a subshell due to `| column`
+    declare -A inode_map
+
+    # STEP 1: Index bind mounts by inode
+    for bind_dir in "$BIND_ROOT"/*; do
+        [ -d "$bind_dir" ] || continue
+        inode=$(stat -c '%i' "$bind_dir" 2>/dev/null || true)
+        [ -n "$inode" ] && inode_map[$inode]="$bind_dir"
+    done
+    #echo "before: ${#inode_map[@]}" >&2
+
+    # STEP 2: Scan WSL2 paths and match by inode
+    while read -r dir; do
+        [ -d "$dir" ] || continue
+		# Must dereference as some of those sources are symlinks to /mnt/space, /mnt/c, etc.
+        inode=$(stat -c '%i' --dereference "$dir" 2>/dev/null || true)
+        bind_dir="${inode_map[$inode]:-}"
+        if [ -n "$bind_dir" ]; then
+            echo "${dir#"$SRV_ROOT/"}|${bind_dir#*Ubuntu/}"
+            unset "inode_map[$inode]"
+		else
+            # 2025-07-03 example `db2` which wasn't running
+            #echo "${dir#"$SRV_ROOT/"}|unknown"
+            :
+        fi
+    done < <(sed -En 's|^[[:space:]]*source:[[:space:]]*["'"'"']?.*('"$SRV_ROOT/"'[^}"'"'"']+)\}?["'"'"']?[[:space:]]*$|\1|p' $SRV_ROOT/*/*.yml | sed 's,/$,,' | sort -u)
+
+    #(
+    #    echo
+    #    echo "after: ${#inode_map[@]}"
+    #    echo "Remaining bind mounts:"
+    #    printf "%s\n" "${inode_map[@]}"
+    #    printf "%s\n" "${!inode_map[@]}"
+    #) >&2
+
+) | column-port -ts'|' -N '[CONTAINER/PATH],[INTERNAL HASH]'

@@ -1,0 +1,5 @@
+#!/bin/bash
+# shellcheck shell=bash
+# Combines `dkcs` and `dkcsu-r` for each Docker Compose project.
+
+exec dkc-loop "$@" -- bash -c 'dkc stop; dkc up -d --remove-orphans --force-recreate'

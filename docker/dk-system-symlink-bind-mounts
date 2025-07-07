@@ -1,0 +1,77 @@
+#!/bin/bash
+# shellcheck shell=bash
+#
+# On the Docker host, create human-friendly symlinks to the bind-mount directories.
+# Must be run after every restart of Docker?
+#
+# Example output:
+#   Creating symlink: /mnt/host/wsl/docker-desktop-bind-mounts.human/caddy.config -> /mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/01204245f4e31b1b805a64791d9ca6a66762398a26eee1697a345a5b1cb3918d
+#
+# To see result:
+#   ls -CF /mnt/wsl/docker-desktop-bind-mounts.human
+# or:
+#   dk-system-shell /bin/ls -lF /mnt/host/wsl/docker-desktop-bind-mounts.human
+
+
+#### Preamble (v2025-02-09)
+
+set -euo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Config
+
+BIND_ROOT="/mnt/host/wsl/docker-desktop-bind-mounts"
+TARGET_DIR="$BIND_ROOT.human"
+
+SRV_ROOT="/srv"
+# Check if /opt/srv exists instead of /srv
+if [[ ! -d "$SRV_ROOT" && -d "/opt/srv" ]]; then
+    SRV_ROOT="/opt/srv"
+fi
+
+DK_SYSTEM_SHELL=dk-system-shell
+
+#### Main
+
+# Create associative array for bind mappings
+declare -A bind_map
+
+# Check if dk-bind-mount-ids command exists
+if command -v dk-bind-mount-ids &>/dev/null; then
+    while read -r source id; do
+        # Replace slashes with dots for the mapping
+        bind_map["$id"]="${source//\//.}"
+    done < <(dk-bind-mount-ids)
+else
+    echo "Warning: dk-bind-mount-ids command not found. Skipping bind mount mappings." >&2
+fi
+
+# Create target directory
+"$DK_SYSTEM_SHELL" /usr/bin/mkdir -p "$TARGET_DIR"
+
+# Wipe the directory (uncomment if needed)
+# "$DK_SYSTEM_SHELL" /usr/bin/find "$TARGET_DIR" -type l -exec rm -f '{}' \;
+
+# Create symlinks
+"$DK_SYSTEM_SHELL" /usr/bin/find "$BIND_ROOT" -mindepth 2 -maxdepth 2 | while read -r source; do
+    id="${source##*/}"
+    if [[ -n "${bind_map[$id]:-}" ]]; then
+        echo "Creating symlink: $TARGET_DIR/${bind_map[$id]} -> $source"
+        "$DK_SYSTEM_SHELL" /usr/bin/ln -sfn "$source" "$TARGET_DIR/${bind_map[$id]}"
+    fi
+done

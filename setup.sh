@@ -145,7 +145,7 @@ relative_dir="${relative_dir#"$HOME/"}"
 
 cd ~/bin
 
-for subdir in contrib mac unixy; do
+for subdir in contrib docker mac unixy; do
     # Install mac scripts only on mac
     [[ $subdir == 'mac' && $OSTYPE != darwin* ]] && continue
 

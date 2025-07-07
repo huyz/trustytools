@@ -1,0 +1,17 @@
+#!/bin/bash
+# shellcheck shell=bash
+# Start an interactive shell in Docker host (or run a fully-qualified command with arguments).
+# Shell is interactive if no argument is passed or first argument is `-it`.
+# Unlike dk-shell and dk-system-bash, here the quoting should work
+
+it=""
+if [[ "${1:-}" == "-it" ]]; then
+    it="-it"
+    shift
+fi
+
+if [[ $# -eq 0 ]]; then
+    it="-it"
+fi
+
+exec docker run --rm $it --privileged --pid=host justincormack/nsenter1 "$@"

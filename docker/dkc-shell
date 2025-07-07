@@ -1,0 +1,50 @@
+#!/bin/bash
+# shellcheck shell=bash
+# Start an interactive shell in the main container of the current docker-compose project.
+# If not in a docker-compose project, then prompt with menu
+
+#### Preamble (v2025-02-09)
+
+set -euo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Main
+
+if ! proj_dir=$(dkc-get-proj-dir); then
+    echo "ERROR: could not determine Docker Compose project directory." >&2
+    exit 1
+fi
+
+if [[ "$proj_dir" != '.' ]]; then
+    echo "Entering: $proj_dir"
+fi
+
+# Save current directory
+original_dir="$PWD"
+cd "$proj_dir" || exit 1
+
+# By convention, the main container for an application has the shortest name.
+container="$(docker compose ps --format json | jq -r '.Name' | awk '{ print length, $0 }' | sort -n | cut -d" " -f2- | head -1)"
+
+if [[ -z "$container" ]]; then
+    echo "No containers found in docker-compose project." >&2
+    cd "$original_dir" || exit 1
+    exit 1
+fi
+
+exec docker exec -it "$container" /bin/sh -c 'eval $(grep ^$(id -un): /etc/passwd | cut -d : -f 7-)'

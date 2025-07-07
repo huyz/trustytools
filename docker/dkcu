@@ -1,0 +1,6 @@
+#!/bin/bash
+# shellcheck shell=bash
+# A wrapper for `docker compose up -d --remove-orphans` that loops through the specified projects,
+# or runs for the current directory, or prompts for the project if necessary.
+
+exec dkc-loop "$@" -- dkc up -d --remove-orphans

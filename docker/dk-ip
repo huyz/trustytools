@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# List the IP addresses of the specified Docker container(s) (Default: all)
+
+# Check for bash 4 for `readarray` or associative arrays
+[ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
+
+#### Preamble (v2025-02-09)
+
+set -euo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Main
+
+containers=()
+if [[ $# -gt 0 ]]; then
+    containers=("$@")
+else
+    readarray -t containers < <(docker ps -aq)
+fi
+
+for container in "${containers[@]}"; do
+    docker inspect -f '{{.Name}}|{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' "$container" 2>/dev/null
+done \
+| sort -u \
+| column-port -t -s'|' -N '[CONTAINER],[IP_ADDRESSES]'

@@ -1,0 +1,58 @@
+#!/bin/bash
+# shellcheck shell=bash
+#
+# On the Docker host, create human-friendly symlinks to the overlay2 directories
+#
+# Example output:
+#   Creating symlink: /var/lib/docker/overlay2.human/caddy -> /var/lib/docker/overlay2/4670c28777d136ba73cf29c8eb941f1f4afe31d1560395a62e671a752f3f6a17/merged
+#
+# To see result:
+#   dk-system-shell /bin/ls -lF /var/lib/docker/overlay2.human
+
+#### Preamble (v2025-02-09)
+
+set -euo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Init
+
+TARGET_DIR="/var/lib/docker/overlay2.human"
+
+DK_SYSTEM_SHELL=dk-system-shell
+
+#### Main
+
+# Create target directory
+"$DK_SYSTEM_SHELL" /usr/bin/mkdir -p "$TARGET_DIR"
+
+# Wipe the directory (uncomment if needed)
+# "$DK_SYSTEM_SHELL" /usr/bin/find "$TARGET_DIR" -type l -exec rm -f '{}' \;
+
+# NOTE: if you compare against the output of `df`, you will see one more overlay2
+# which is likely to be the one for the current nsenter1 container
+docker ps -aq | while read -r cid; do
+    name_and_merged=$(docker inspect -f '{{.Name}} {{.GraphDriver.Data.MergedDir}}' "$cid" 2>/dev/null || echo "")
+    if [[ -n "$name_and_merged" ]]; then
+        read -r name merged_dir <<< "$name_and_merged"
+        if [[ -n "$name" && -n "$merged_dir" ]]; then
+            name="${name#/}"
+            echo "Creating symlink: $TARGET_DIR/$name -> $merged_dir"
+            "$DK_SYSTEM_SHELL" /usr/bin/ln -sfn "$merged_dir" "$TARGET_DIR/$name"
+        fi
+    fi
+done

@@ -59,6 +59,10 @@ useful for everyday use.
 | `unretina`                        | Reduces the resolution of Retina screenshots to regular resolution                                                                                         |
 | `window-layout-save`              | Saves the current window positions and sizes of all open applications into a new AppleScript script which can be used to restore the window positions.     |
 
+## Docker folder
+
+See [docker/README.md](docker/README.md) for details.
+
 ## Contrib folder
 
 Other folks' scripts found here and there.

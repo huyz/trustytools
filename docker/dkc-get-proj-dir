@@ -1,0 +1,68 @@
+#!/bin/bash
+# shellcheck shell=bash
+# Either:
+# a) Outputs the directory of the specified docker compose project,
+# b) If no argument, outputs the current directory if PWD is a docker compose project
+# c) Prompts the user to select a docker compose project and outputs its directory.
+
+#### Preamble (v2025-02-09)
+
+set -euo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Main
+
+if [[ "${1:-}" == '--help' || "${1:-}" == '-h' || $# -gt 1 ]]; then
+    echo "Usage: $SCRIPT_NAME [project_name]"
+    echo "  Outputs the directory of the specified docker compose project."
+    echo "  Or if no argument, outputs the current directory if in a project."
+    echo "  Otherwise, prompts to select a project from the list."
+    exit 0
+fi
+
+
+if [[ -n "${1:-}" ]]; then
+    # If an argument is provided, use it as the project name
+    proj="$1"
+
+else
+
+    # If already in a project home, just return that
+    if docker compose ps -q &>/dev/null; then
+        echo '.'
+        exit 0
+    fi
+
+    # Get the list of all the known docker compose projects and prompt
+    # the user to select one.
+    proj=$(docker compose ls -aq | fzf --tac || true)
+    if [[ -z "$proj" ]]; then
+        echo "ERROR: No docker-compose project selected." >&2
+        exit 1
+    fi
+fi
+
+proj_dir=$(docker compose ls -a | sed -En "s,^${proj}[[:space:]]+.*[[:space:]](/.*.ya?ml)\$,\\1,p")
+proj_dir="${proj_dir%/*}"
+
+if [[ ! -d "$proj_dir" ]]; then
+    echo "ERROR: No docker-compose project found." >&2
+    exit 1
+fi
+
+echo "$proj_dir"
