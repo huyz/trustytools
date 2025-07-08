@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Lists the mappings from bind mount names to Docker-internal IDs
+# Only the long syntax for volume bind-mounts is supported.
 # NOTE: this doesn't catch bind mounts that may be created by short-lived containers
 
 #### Preamble (v2025-02-09)
@@ -43,25 +44,25 @@ BIND_ROOT="/mnt/wsl/docker-desktop-bind-mounts/Ubuntu"
     declare -A inode_map
 
     # STEP 1: Index bind mounts by inode
-    for bind_dir in "$BIND_ROOT"/*; do
-        [ -d "$bind_dir" ] || continue
-        inode=$(stat -c '%i' "$bind_dir" 2>/dev/null || true)
-        [ -n "$inode" ] && inode_map[$inode]="$bind_dir"
+    for dst in "$BIND_ROOT"/*; do
+        [[ -d "$dst" || -e "$dst" ]] || continue
+        inode=$(stat -c '%i' "$dst" 2>/dev/null || true)
+        [[ -n "$inode" ]] && inode_map[$inode]="$dst"
     done
     #echo "before: ${#inode_map[@]}" >&2
 
     # STEP 2: Scan WSL2 paths and match by inode
-    while read -r dir; do
-        [ -d "$dir" ] || continue
+    while read -r src; do
+        [[ -d "$dst" || -e "$dst" ]] || continue
 		# Must dereference as some of those sources are symlinks to /mnt/space, /mnt/c, etc.
-        inode=$(stat -c '%i' --dereference "$dir" 2>/dev/null || true)
+        inode=$(stat -c '%i' --dereference "$src" 2>/dev/null || true)
         bind_dir="${inode_map[$inode]:-}"
         if [ -n "$bind_dir" ]; then
-            echo "${dir#"$SRV_ROOT/"}|${bind_dir#*Ubuntu/}"
+            echo "${src#"$SRV_ROOT/"}|${bind_dir#*Ubuntu/}"
             unset "inode_map[$inode]"
 		else
             # 2025-07-03 example `db2` which wasn't running
-            #echo "${dir#"$SRV_ROOT/"}|unknown"
+            #echo "${src#"$SRV_ROOT/"}|unknown"
             :
         fi
     done < <(sed -En 's|^[[:space:]]*source:[[:space:]]*["'"'"']?.*('"$SRV_ROOT/"'[^}"'"'"']+)\}?["'"'"']?[[:space:]]*$|\1|p' $SRV_ROOT/*/*.yml | sed 's,/$,,' | sort -u)
