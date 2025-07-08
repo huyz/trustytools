@@ -40,7 +40,7 @@ for container in "${containers[@]}"; do
 done | sed -En '\,(/opt)?/srv/,p' | sort -u | while read -r src; do
     if [[ -d "$src" ]]; then
         echo "  ✅ Marking bind mount: $src/.srv-bind-mount…"
-        date -Isec | sudo sh -c "cat > '$src/.srv-bind-mount'"
+        date -Iseconds | sudo sh -c "cat > '$src/.srv-bind-mount'"
     elif [[ -e "$src" ]]; then
         echo "  ⚠️ Skipping non-directory: ${src}…"
     else
