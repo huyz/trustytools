@@ -34,6 +34,13 @@ else
     readarray -t containers < <(docker ps -aq)
 fi
 
+function check_container_running {
+    if [[ -z "$(docker ps -q --filter "name=$1" --filter "status=running")" ]]; then
+        echo "  ❗️ $container_name: Container is not running"
+        return 1
+    fi
+}
+
 for container in "${containers[@]}"; do
     docker inspect -f '{{.Name}}|{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}={{.Destination}} {{end}}{{end}}' "$container" 2>/dev/null
 done | while IFS='|' read -r container_name rest; do
@@ -46,10 +53,21 @@ done | while IFS='|' read -r container_name rest; do
             IFS='=' read -r src dst <<< "$mount"
             [[ $src =~ ^(/opt)?/srv/ ]] || continue
             if [[ -d "$src" ]]; then
-                if "$(dirname "$0")/dk-shell" "$container_name" test -f "$dst/.srv-bind-mount"; then
-                    echo "  ✅ Bind mount looks successful: ${container_name}:$dst/.srv-bind-mount"
+                check_container_running "$container_name" || continue
+                # NOTE: `-e` because we check for both ordinary file and directory (for
+                #   dockervolumebackup exception) in the container
+                #   https://github.com/offen/docker-volume-backup/issues/607
+                if docker exec "$container_name" test -e "$dst/.srv-bind-mount"; then
+                    echo "  ✅ Bind mount of directory looks successful: ${container_name}:$dst/.srv-bind-mount"
                 else
-                    echo "  ❌️ Bind mount looks wrong: ${container_name}:$dst/.srv-bind-mount"
+                    echo "  ❌️ Bind mount of directory looks wrong: ${container_name}:$dst/.srv-bind-mount"
+                fi
+            elif [[ -f "$src" ]]; then
+                check_container_running "$container_name" || continue
+                if cmp "$src" <(docker exec "$container_name" cat "$dst"); then
+                    echo "  ✅ Bind mount of file looks successful: ${container_name}:$dst"
+                else
+                    echo "  ❌️ Bind mount of file looks wrong: ${container_name}:$dst"
                 fi
             elif [[ -e "$src" ]]; then
                 echo "  ⚠️ Skipping non-directory: ${container_name}:${dst}…"

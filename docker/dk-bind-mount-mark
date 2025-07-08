@@ -16,14 +16,44 @@ trap trap_err ERR
 trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
+_install_cmd='brew install'
+if [[ $OSTYPE == darwin* ]]; then
+    if [[ "${EUID:-$UID}" -eq 0 ]]; then
+        _install_cmd='sudo port install'
+        MAC_PREFIX=/opt/local
+        [[ -x "${GETOPT:="$MAC_PREFIX/bin/getopt"}" ]] || \
+            { echo "$0: ERROR: \`$_install_cmd util-linux\` to install $GETOPT." >&2; exit 1; }
+#        [[ -x "${SED:="$MAC_PREFIX/bin/gsed"}" ]] || \
+#            { echo "$0: ERROR: \`$_install_cmd gsed\` to install $SED." >&2; exit 1; }
+    else
+        HOMEBREW_PREFIX="$( (/opt/homebrew/bin/brew --prefix || /usr/local/bin/brew --prefix || brew --prefix) 2>/dev/null)"
+        MAC_PREFIX="$HOMEBREW_PREFIX"
+        [[ -x "${GETOPT:="$MAC_PREFIX/opt/gnu-getopt/bin/getopt"}" ]] || \
+            { echo "$0: ERROR: \`$_install_cmd gnu-getopt\` to install $GETOPT." >&2; exit 1; }
+#        [[ -x "${SED:="$MAC_PREFIX/bin/gsed"}" ]] || \
+#            { echo "$0: ERROR: \`$_install_cmd gnu-sed\` to install $SED." >&2; exit 1; }
+    fi
+    [[ -x "${REALPATH:="$MAC_PREFIX/bin/grealpath"}" ]] || \
+        { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $REALPATH." >&2; exit 1; }
+    CHOWN="gchown" # also coreutils
+    CHMOD="gchmod" # also coreutils
+else
+    _install_cmd='sudo apt install'
+    HOMEBREW_PREFIX="$( (/home/linuxbrew/.linuxbrew/bin/brew --prefix || brew --prefix) 2>/dev/null)"
+    GETOPT="getopt"
+    REALPATH="realpath"
+    CHOWN="chown"
+    CHMOD="chmod"
+fi
+
 # shellcheck disable=SC2034
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
-script="${BASH_SOURCE[0]}"
-while [[ -L "$script" ]]; do
-    script="$(readlink "$script")"
-done
+# a) Uncomment to expand symlinks in order to find the proper .envrc for direnv
+#SCRIPT="$($REALPATH "${BASH_SOURCE[0]}")"
+# b) Uncomment in the general case
+SCRIPT="$($REALPATH --no-symlinks "${BASH_SOURCE[0]}")"
 # shellcheck disable=SC2034
-SCRIPT_DIR="$(dirname "$script")"
+SCRIPT_DIR="$(dirname "$SCRIPT")"
 
 ##############################################################################
 #### Main
@@ -39,10 +69,25 @@ for container in "${containers[@]}"; do
     docker inspect -f '{{range .Mounts}}{{if eq .Type "bind"}}{{printf "%s\n" .Source}}{{end}}{{end}}' "$container" 2>/dev/null
 done | sed -En '\,(/opt)?/srv/,p' | sort -u | while read -r src; do
     if [[ -d "$src" ]]; then
-        echo "  ✅ Marking bind mount: $src/.srv-bind-mount…"
-        date -Iseconds | sudo sh -c "cat > '$src/.srv-bind-mount'"
+        # Special case for service that can't handle dotfiles, e.g.
+        # https://github.com/offen/docker-volume-backup/issues/607
+        if [[ "$src" == */docker*volume*backup/conf* ]]; then
+            sudo mkdir -p "$src/.srv-bind-mount"
+            sudo "$CHOWN" --reference="$src" "$src/.srv-bind-mount"
+            sudo "$CHMOD" --reference="$src" "$src/.srv-bind-mount"
+            dst="$src/.srv-bind-mount/.srv-bind-mount"
+        else
+            dst="$src/.srv-bind-mount"
+        fi
+        echo "  ✅ Marking bind mount: ${dst}…"
+        date -Iseconds | sudo sh -c "cat > '${dst}'"
+        # Change ownership and permissions to match the parent directory $src
+        sudo "$CHOWN" --reference="$src" "$dst"
+        sudo "$CHMOD" --reference="$src" "$dst"
+    elif [[ -f "$src" ]]; then
+        echo "  🙈️ Skipping ordinary file: ${src}…"
     elif [[ -e "$src" ]]; then
-        echo "  ⚠️ Skipping non-directory: ${src}…"
+        echo "  ⚠️ Skipping special file: ${src}…"
     else
         echo "  ❗️ Directory not found: ${src}…"
     fi
