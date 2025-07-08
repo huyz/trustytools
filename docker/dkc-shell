@@ -25,7 +25,16 @@ SCRIPT_DIR="$(dirname "$script")"
 ##############################################################################
 #### Main
 
-if ! proj_dir=$(dkc-get-proj-dir); then
+usage() {
+    echo "Usage: $SCRIPT_NAME [compose_project…]"
+}
+
+if [[ "${1:-}" == '--help' || "${1:-}" == '-h' ]]; then
+    usage
+    exit 0
+fi
+
+if ! proj_dir=$(dkc-get-proj-dir "${1:-}"); then
     echo "ERROR: could not determine Docker Compose project directory." >&2
     exit 1
 fi
