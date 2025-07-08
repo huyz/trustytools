@@ -9,6 +9,8 @@
 
 set -euo pipefail
 shopt -s failglob
+shopt -s nullglob extglob dotglob
+
 function trap_err { echo "ERR signal on line $(caller)" >&2; }
 trap trap_err ERR
 trap exit INT
@@ -156,6 +158,7 @@ for subdir in contrib docker mac unixy; do
 
     relative_dir="$prefix/${SCRIPT_DIR#"$HOME"/}"
 
+    GLOBIGNORE="$relative_dir/$subdir/@(.dir_colors|.DS_Store|.aws|.config|.cron|.idea|.ssh|*.swp|*.swo|.vscode|+ARCHIVED|*.md)"
     for i in "$relative_dir"/"$subdir"/*; do
         link_name="$(basename "$i")"
         link_name=${link_name%.*}
