@@ -41,6 +41,43 @@ function check_container_running {
     fi
 }
 
+# Helper to run a command and capture stdout/stderr to variables, cleaning up temp files.
+# Usage: capture_cmd_output <cmd...>
+# Sets: CAPTURED_STDOUT, CAPTURED_STDERR
+function capture_cmd_output {
+    local temp_stdout temp_stderr
+    temp_stdout=$(mktemp)
+    temp_stderr=$(mktemp)
+    local exit_code=0
+    #echo "#❯ $* > $temp_stdout 2> $temp_stderr" >&2
+    "$@" > "$temp_stdout" 2> "$temp_stderr" || exit_code="$?"
+    CAPTURED_STDOUT=$(cat "$temp_stdout")
+    CAPTURED_STDERR=$(cat "$temp_stderr")
+    rm "$temp_stdout" "$temp_stderr"
+    return "$exit_code"
+}
+
+function container_cat {
+    local container="$1" file="$2"
+    shift
+    local exit_code=0
+    #echo capture_cmd_output docker exec "$container" cat "$file" >&2
+    capture_cmd_output docker exec "$container" cat "$file" || exit_code="$?"
+    if [[ -n "$CAPTURED_STDOUT" && "$CAPTURED_STDOUT" == *'runtime exec failed'* ]]; then
+        echo "  2️⃣ Container $container has no basic utilities; falling back to 'alpine nsenter'…" >&2
+        # This container doesn't even have `test` or `cat` tools
+        # so try again with a helper container
+        pid=$(docker inspect --format '{{.State.Pid}}' "$container")
+        docker run --rm --privileged --pid=host alpine nsenter cat "/proc/$pid/root$file"
+    elif [[ -n "$CAPTURED_STDERR" ]]; then
+        echo "  ❌️ Error executing command in container $container:" >&2
+        echo "$CAPTURED_STDERR" >&2
+    else
+        echo "$CAPTURED_STDOUT"
+    fi
+    return "$exit_code"
+}
+
 for container in "${containers[@]}"; do
     docker inspect -f '{{.Name}}|{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}={{.Destination}} {{end}}{{end}}' "$container" 2>/dev/null
 done | while IFS='|' read -r container_name rest; do
@@ -52,22 +89,24 @@ done | while IFS='|' read -r container_name rest; do
             [[ -n "$mount" ]] || continue
             IFS='=' read -r src dst <<< "$mount"
             [[ $src =~ ^(/opt)?/srv/ ]] || continue
-            if [[ -d "$src" ]]; then
+            if [[ -d "$src" || -f "$src" ]]; then
                 check_container_running "$container_name" || continue
-                # NOTE: `-e` because we check for both ordinary file and directory (for
-                #   dockervolumebackup exception) in the container
+                # Special case for dockervolumebackup which doesn't accept dotfiles at root:
+                #   the sentinel file is nested in a same-named directory
                 #   https://github.com/offen/docker-volume-backup/issues/607
-                if docker exec "$container_name" test -e "$dst/.srv-bind-mount"; then
-                    echo "  ✅ Bind mount of directory looks successful: ${container_name}:$dst/.srv-bind-mount"
-                else
-                    echo "  ❌️ Bind mount of directory looks wrong: ${container_name}:$dst/.srv-bind-mount"
+                if [[ -d "$src/.srv-bind-mount" ]]; then
+                    src="$src/.srv-bind-mount/.srv-bind-mount"
+                    dst="$dst/.srv-bind-mount/.srv-bind-mount"
+                elif [[ -d "$src" ]]; then
+                    src="$src/.srv-bind-mount"
+                    dst="$dst/.srv-bind-mount"
                 fi
-            elif [[ -f "$src" ]]; then
-                check_container_running "$container_name" || continue
-                if cmp "$src" <(docker exec "$container_name" cat "$dst"); then
-                    echo "  ✅ Bind mount of file looks successful: ${container_name}:$dst"
+                #echo "src=$src"
+                #echo "dst=$dst"
+                if cmp "$src" <(container_cat "$container_name" "$dst"); then
+                    echo "  ✅ Bind mount looks successful: ${container_name}:$dst"
                 else
-                    echo "  ❌️ Bind mount of file looks wrong: ${container_name}:$dst"
+                    echo "  ❌️ Bind mount looks wrong: ${container_name}:$dst"
                 fi
             elif [[ -e "$src" ]]; then
                 echo "  ⚠️ Skipping non-directory: ${container_name}:${dst}…"
