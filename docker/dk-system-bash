@@ -31,6 +31,17 @@ SCRIPT_DIR="$(dirname "$script")"
 
 DK_SYSTEM_SHELL=dk-system-shell
 
+#### Usage
+
+usage() {
+    echo "Usage: ${BASH_SOURCE[0]} [<command> [arg…]]"
+}
+
+if [[ "${1:-}" == '--help' || "${1:-}" == '-h' ]]; then
+    usage
+    exit 0
+fi
+
 #### Checks
 
 if [[ "${OS_RELEASE:-}" != *WSL* ]]; then

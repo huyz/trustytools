@@ -4,6 +4,16 @@
 # Shell is interactive if no argument is passed or first argument is `-it`.
 # Unlike dk-shell and dk-system-bash, here the quoting should work
 
+usage() {
+    echo "Usage: ${BASH_SOURCE[0]} [-it] [<fully_qualified_command> [arg…]]"
+    echo "  -it: Force an interactive shell"
+}
+
+if [[ "${1:-}" == '--help' || "${1:-}" == '-h' ]]; then
+    usage
+    exit 0
+fi
+
 it=""
 if [[ "${1:-}" == "-it" ]]; then
     it="-it"
