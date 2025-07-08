@@ -82,6 +82,8 @@ done | sed -En '\,(/opt)?/srv/,p' | sort -u | while read -r src; do
         echo "  ✅ Marking bind mount: ${dst}…"
         date -Iseconds | sudo sh -c "cat > '${dst}'"
         # Change ownership and permissions to match the parent directory $src
+        # or some containers will try to change ownership/perms of this file
+        # and would fail to start up.
         sudo "$CHOWN" --reference="$src" "$dst"
         sudo "$CHMOD" --reference="$src" "$dst"
     elif [[ -f "$src" ]]; then

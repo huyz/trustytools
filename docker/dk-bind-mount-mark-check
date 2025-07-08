@@ -89,6 +89,7 @@ done | while IFS='|' read -r container_name rest; do
             [[ -n "$mount" ]] || continue
             IFS='=' read -r src dst <<< "$mount"
             [[ $src =~ ^(/opt)?/srv/ ]] || continue
+
             if [[ -d "$src" || -f "$src" ]]; then
                 check_container_running "$container_name" || continue
                 # Special case for dockervolumebackup which doesn't accept dotfiles at root:
@@ -103,11 +104,19 @@ done | while IFS='|' read -r container_name rest; do
                 fi
                 #echo "src=$src"
                 #echo "dst=$dst"
-                if sudo cmp "$src" <(container_cat "$container_name" "$dst"); then
+
+                # Create temporary file because "$src" may not be readable by current user
+                tempfile="$(mktemp "${TMP:-/tmp}/$(basename "$SCRIPT_NAME").XXXXXXX")"
+                sudo cp "$src" "$tempfile"
+                sudo chmod 600 "$tempfile"
+                sudo chown $EUID "$tempfile"
+
+                if cmp "$tempfile" <(container_cat "$container_name" "$dst"); then
                     echo "  ✅ Bind mount looks successful: ${container_name}:$dst"
                 else
                     echo "  ❌️ Bind mount looks wrong: ${container_name}:$dst"
                 fi
+                rm -f "$tempfile"
             elif [[ -e "$src" ]]; then
                 echo "  ⚠️ Skipping non-directory: ${container_name}:${dst}…"
             else
