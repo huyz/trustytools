@@ -103,7 +103,7 @@ done | while IFS='|' read -r container_name rest; do
                 fi
                 #echo "src=$src"
                 #echo "dst=$dst"
-                if cmp "$src" <(container_cat "$container_name" "$dst"); then
+                if sudo cmp "$src" <(container_cat "$container_name" "$dst"); then
                     echo "  ✅ Bind mount looks successful: ${container_name}:$dst"
                 else
                     echo "  ❌️ Bind mount looks wrong: ${container_name}:$dst"
