@@ -70,7 +70,7 @@ function container_cat {
         pid=$(docker inspect --format '{{.State.Pid}}' "$container")
         docker run --rm --privileged --pid=host alpine nsenter cat "/proc/$pid/root$file"
     elif [[ -n "$CAPTURED_STDERR" ]]; then
-        echo "  ❌️ Error executing command in container $container:" >&2
+        echo "❗ ${container}: can't find sentinel:" >&2
         echo "$CAPTURED_STDERR" >&2
     else
         echo "$CAPTURED_STDOUT"
@@ -111,16 +111,16 @@ done | while IFS='|' read -r container_name rest; do
                 sudo chmod 600 "$tempfile"
                 sudo chown $EUID "$tempfile"
 
-                if cmp "$tempfile" <(container_cat "$container_name" "$dst"); then
-                    echo "  ✅ Bind mount looks successful: ${container_name}:$dst"
+                if cmp "$tempfile" <(container_cat "$container_name" "$dst") &>/dev/null; then
+                    echo "✅ ${container_name}: Bind mount OK: $dst"
                 else
-                    echo "  ❌️ Bind mount looks wrong: ${container_name}:$dst"
+                    echo "❌️ ${container_name}: Bind mount BAD: $dst"
                 fi
                 rm -f "$tempfile"
             elif [[ -e "$src" ]]; then
-                echo "  ⚠️ Skipping non-directory: ${container_name}:${dst}…"
+                echo "  ⚠️ ${container_name}: Skipping non-directory: ${dst}…"
             else
-                echo "  ❗️ $container_name: Local directory not found: ${src}…"
+                echo "  ❗️ ${container_name}: Local directory not found: ${src}…"
             fi
         done
     fi

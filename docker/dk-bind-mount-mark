@@ -79,7 +79,7 @@ done | sed -En '\,(/opt)?/srv/,p' | sort -u | while read -r src; do
         else
             dst="$src/.srv-bind-mount"
         fi
-        echo "  ✅ Marking bind mount: ${dst}…"
+        echo "✅ Marking bind mount: ${dst}…"
         date -Iseconds | sudo sh -c "cat > '${dst}'"
         # Change ownership and permissions to match the parent directory $src
         # or some containers will try to change ownership/perms of this file
@@ -87,10 +87,10 @@ done | sed -En '\,(/opt)?/srv/,p' | sort -u | while read -r src; do
         sudo "$CHOWN" --reference="$src" "$dst"
         sudo "$CHMOD" --reference="$src" "$dst"
     elif [[ -f "$src" ]]; then
-        echo "  🙈️ Skipping ordinary file: ${src}…"
+        echo "🙈️ Skipping ordinary file: ${src}…"
     elif [[ -e "$src" ]]; then
-        echo "  ⚠️ Skipping special file: ${src}…"
+        echo "⚠️ Skipping special file: ${src}…"
     else
-        echo "  ❗️ Directory not found: ${src}…"
+        echo "❗️ Directory not found: ${src}…"
     fi
 done
