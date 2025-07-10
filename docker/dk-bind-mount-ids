@@ -34,6 +34,8 @@ fi
 #### Config
 
 SRV_ROOT=/srv
+[[ ! -d "$SRV_ROOT" && -d /opt/srv ]] && SRV_ROOT=/opt/srv
+
 BIND_ROOT="/mnt/wsl/docker-desktop-bind-mounts/Ubuntu"
 
 #### Main

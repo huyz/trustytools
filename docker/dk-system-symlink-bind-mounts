@@ -35,14 +35,13 @@ SCRIPT_DIR="$(dirname "$script")"
 ##############################################################################
 #### Config
 
+# SRV_ROOT is the base directory for all the Docker Compose projects.
+SRV_ROOT=/srv
+# On macOS, we don't have access to / but we have access to /opt
+[[ -d /opt/srv ]] && SRV_ROOT=/opt/srv
+
 BIND_ROOT="/mnt/host/wsl/docker-desktop-bind-mounts"
 TARGET_DIR="$BIND_ROOT.human"
-
-SRV_ROOT="/srv"
-# Check if /opt/srv exists instead of /srv
-if [[ ! -d "$SRV_ROOT" && -d "/opt/srv" ]]; then
-    SRV_ROOT="/opt/srv"
-fi
 
 DK_SYSTEM_SHELL=dk-system-shell
 
