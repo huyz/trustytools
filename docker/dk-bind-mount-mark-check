@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Check every bind-mounted directory for proper mount into containers.
+# Check the bind mounts for the specified containers (default: all)
 
 # Check for bash 4 for `readarray` or associative arrays
 [ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
@@ -25,6 +25,13 @@ done
 SCRIPT_DIR="$(dirname "$script")"
 
 ##############################################################################
+#### Config
+
+# SRV_ROOT is the base directory for all the Docker Compose projects.
+SRV_ROOT=/srv
+# On macOS, we don't have access to / but we have access to /opt
+[[ -d /opt/srv ]] && SRV_ROOT=/opt/srv
+
 #### Main
 
 containers=()
@@ -88,35 +95,45 @@ done | while IFS='|' read -r container_name rest; do
         for mount in "${mounts[@]}"; do
             [[ -n "$mount" ]] || continue
             IFS='=' read -r src dst <<< "$mount"
-            [[ $src =~ ^(/opt)?/srv/ ]] || continue
+            [[ $src =~ ^"$SRV_ROOT"/ ]] || continue
 
             if [[ -d "$src" || -f "$src" ]]; then
                 check_container_running "$container_name" || continue
-                # Special case for dockervolumebackup which doesn't accept dotfiles at root:
-                #   the sentinel file is nested in a same-named directory
-                #   https://github.com/offen/docker-volume-backup/issues/607
-                if [[ -d "$src/.srv-bind-mount" ]]; then
-                    src="$src/.srv-bind-mount/.srv-bind-mount"
-                    dst="$dst/.srv-bind-mount/.srv-bind-mount"
-                elif [[ -d "$src" ]]; then
-                    src="$src/.srv-bind-mount"
-                    dst="$dst/.srv-bind-mount"
+
+                if [[ -d "$src" ]]; then
+                    # Some containers (e.g. postgresql) restrict the directories and since we don't
+                    # want this script to run with sudo, we go to the fallback directory
+                    if [[ ! -r "$src/.srv-bind-mount" ]]; then
+                        proj_dir="${src#"$SRV_ROOT"/}"
+                        sub_path="${proj_dir#*/}"
+                        proj_dir="$SRV_ROOT/${proj_dir%%/*}"
+                        if [[ ! -d "$proj_dir" ]]; then
+                            echo "❗️ Project directory not found: ${proj_dir}…"
+                            continue
+                        fi
+                        fallback_root="$proj_dir/.srv-bind-mount.d"
+                        src="$fallback_root/$sub_path"
+                    fi
+
+                    # Special case for dockervolumebackup which doesn't accept dotfiles at root:
+                    #   the sentinel file is nested in a same-named directory
+                    #   https://github.com/offen/docker-volume-backup/issues/607
+                    if [[ -d "$src/.srv-bind-mount" ]]; then
+                        src="$src/.srv-bind-mount/.srv-bind-mount"
+                        dst="$dst/.srv-bind-mount/.srv-bind-mount"
+                    elif [[ -d "$src" ]]; then
+                        src="$src/.srv-bind-mount"
+                        dst="$dst/.srv-bind-mount"
+                    fi
+                    #echo "src=$src"
+                    #echo "dst=$dst"
                 fi
-                #echo "src=$src"
-                #echo "dst=$dst"
 
-                # Create temporary file because "$src" may not be readable by current user
-                tempfile="$(mktemp "${TMP:-/tmp}/$(basename "$SCRIPT_NAME").XXXXXXX")"
-                sudo cp "$src" "$tempfile"
-                sudo chmod 600 "$tempfile"
-                sudo chown $EUID "$tempfile"
-
-                if cmp "$tempfile" <(container_cat "$container_name" "$dst") &>/dev/null; then
+                if cmp "$src" <(container_cat "$container_name" "$dst") &>/dev/null; then
                     echo "✅ ${container_name}: Bind mount OK: $dst"
                 else
                     echo "❌️ ${container_name}: Bind mount BAD: $dst"
                 fi
-                rm -f "$tempfile"
             elif [[ -e "$src" ]]; then
                 echo "  ⚠️ ${container_name}: Skipping non-directory: ${dst}…"
             else

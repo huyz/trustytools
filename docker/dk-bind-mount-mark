@@ -56,6 +56,13 @@ SCRIPT="$($REALPATH --no-symlinks "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT")"
 
 ##############################################################################
+#### Config
+
+# SRV_ROOT is the base directory for all the Docker Compose projects.
+SRV_ROOT=/srv
+# On macOS, we don't have access to / but we have access to /opt
+[[ -d /opt/srv ]] && SRV_ROOT=/opt/srv
+
 #### Main
 
 containers=()
@@ -67,25 +74,51 @@ fi
 
 for container in "${containers[@]}"; do
     docker inspect -f '{{range .Mounts}}{{if eq .Type "bind"}}{{printf "%s\n" .Source}}{{end}}{{end}}' "$container" 2>/dev/null
-done | sed -En '\,(/opt)?/srv/,p' | sort -u | while read -r src; do
+done | sort -u | while read -r src; do
+    [[ $src =~ ^"$SRV_ROOT"/ ]] || continue
+
     if [[ -d "$src" ]]; then
+        proj_dir="${src#"$SRV_ROOT"/}"
+        sub_path="${proj_dir#*/}"
+        proj_dir="$SRV_ROOT/${proj_dir%%/*}"
+        if [[ ! -d "$proj_dir" ]]; then
+            echo "❗️ Project directory not found: ${proj_dir}…"
+            continue
+        fi
+        fallback_root="$proj_dir/.srv-bind-mount.d"
+        fallback_src="$fallback_root/$sub_path"
+
+        # Make a fallback copy so that dk-bind-mount-mark-check can work without sudo
+        # for directories that containers (e.g. postgresql) restrict
+        sudo mkdir -p "$fallback_src"
+        sudo "$CHOWN" -R --reference="$proj_dir" "$fallback_root"
+        sudo "$CHMOD" -R 755 "$fallback_root"
+
         # Special case for service that can't handle dotfiles, e.g.
         # https://github.com/offen/docker-volume-backup/issues/607
         if [[ "$src" == */docker*volume*backup/conf* ]]; then
-            sudo mkdir -p "$src/.srv-bind-mount"
-            sudo "$CHOWN" --reference="$src" "$src/.srv-bind-mount"
-            sudo "$CHMOD" --reference="$src" "$src/.srv-bind-mount"
-            dst="$src/.srv-bind-mount/.srv-bind-mount"
+            for i in "$src/.srv-bind-mount" "$fallback_src/.srv-bind-mount"; do
+                sudo mkdir -p "$i"
+                sudo "$CHOWN" --reference="$(dirname "$i")" "$i"
+                sudo "$CHMOD" 755 "$i"
+            done
+            # NOTE: don't be confused; this references a file while the above references a subdir of a subdir
+            dst_path=".srv-bind-mount/.srv-bind-mount"
         else
-            dst="$src/.srv-bind-mount"
+            dst_path=".srv-bind-mount"
         fi
-        echo "✅ Marking bind mount: ${dst}…"
-        date -Iseconds | sudo sh -c "cat > '${dst}'"
+
+        echo "✅ Marking bind mount: ${src}/${dst_path}…"
+        date -Iseconds | sudo sh -c "cat > '${src}/${dst_path}'"
+        sudo cp -a "$src/$dst_path" "$fallback_src/$dst_path"
         # Change ownership and permissions to match the parent directory $src
         # or some containers will try to change ownership/perms of this file
         # and would fail to start up.
-        sudo "$CHOWN" --reference="$src" "$dst"
-        sudo "$CHMOD" --reference="$src" "$dst"
+        for i in "$src/$dst_path" "$fallback_src/$dst_path"; do
+            sudo "$CHOWN" --reference="$(dirname "$i")" "$i"
+            sudo "$CHMOD" 644 "$i"
+        done
+
     elif [[ -f "$src" ]]; then
         echo "🙈️ Skipping ordinary file: ${src}…"
     elif [[ -e "$src" ]]; then
