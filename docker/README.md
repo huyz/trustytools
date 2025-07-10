@@ -58,6 +58,11 @@ The following tools are required for these scripts to work properly:
   - Checks if `.srv-bind-mount` files are accessible from containers
   - Usage: `dk-bind-mount-mark-check [container...]` (default: all containers)
 
+- **`dk-bind-mount-mark-autorestart`** - Auto-restarts Docker Compose projects
+    until bind mounts are correct
+  - Checks if `.srv-bind-mount` files are accessible from containers
+  - Usage: `dk-bind-mount-mark-autorestart [project...]` (default: all projects)
+
 ## Docker Compose Scripts
 
 ### Core Compose Utilities

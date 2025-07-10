@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Check the bind mounts for the specified Docker Compose projects (default: all) and
+# restart the services until the bind mounts are correct.
+
+# Check for bash 4 for `readarray` or associative arrays
+[ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
+
+#### Preamble (v2025-02-09)
+
+set -euo pipefail
+shopt -s failglob
+# shellcheck disable=SC2317
+function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+trap trap_err ERR
+trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+# shellcheck disable=SC2034
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+script="${BASH_SOURCE[0]}"
+while [[ -L "$script" ]]; do
+    script="$(readlink "$script")"
+done
+# shellcheck disable=SC2034
+SCRIPT_DIR="$(dirname "$script")"
+
+##############################################################################
+#### Config
+
+# SRV_ROOT is the base directory for all the Docker Compose projects.
+SRV_ROOT=/srv
+# On macOS, we don't have access to / but we have access to /opt
+[[ -d /opt/srv ]] && SRV_ROOT=/opt/srv
+
+#### Init
+
+if [[ $# -eq 0 ]]; then
+    # shellcheck disable=SC2046
+    set -- $(docker compose ls -aq || true)
+fi
+
+declare -A services_to_check
+for i in "$@"; do
+    services_to_check["$i"]=1
+done
+
+#### Main
+
+echo "𐄫 Checking bind mounts:"
+round=1
+while [[ "${#services_to_check[@]}" -gt 0 ]]; do
+    echo
+    echo "  𐄬 Round ${round}: ${#services_to_check[@]} service(s) to check…"
+    for service in "${!services_to_check[@]}"; do
+        srv_dir="$SRV_ROOT/$service"
+
+        if [[ -d "$srv_dir" ]]; then
+            # shellcheck disable=SC2046
+            readarray -t out < <(dk-bind-mount-mark-check $(cd "$srv_dir"; docker compose ps -q))
+            ok_count=$(printf '%s\n' "${out[@]}" | grep -c OK || true)
+            bad_count=$(printf '%s\n' "${out[@]}" | grep -c BAD || true)
+            if [[ "$bad_count" -gt 0 ]]; then
+                echo "  ❌ $service: $bad_count bind mount(s) not ready ($ok_count OK). Restarting…"
+                dkcsu "$service"
+            else
+                unset "services_to_check[$service]"
+            fi
+        elif [[ "$service" == *docker-extension* ]]; then
+            unset "services_to_check[$service]"
+        else
+            echo "  ⚠️ Skipping $service (controlled at host)"
+            unset "services_to_check[$service]"
+        fi
+    done
+
+    if [[ "${#services_to_check[@]}" -gt 0 ]]; then
+        sleep 5
+        (( round++ ))
+    fi
+done
+
+echo
+echo "✅ All bind mounts are ready."
