@@ -78,6 +78,10 @@ The following tools are required for these scripts to work properly:
 
 ### Project Management
 
+- **`dkc-compose-file`** - Checks if current directory is a Docker Compose project
+    and prints out the detected compose files.
+  - Usage: `dkc-compose-file`
+
 - **`dkcs`** - Stop Docker Compose projects
   - Usage: `dkcs [project...]` (default: current directory or prompt)
   - Wrapper for `docker compose stop`
