@@ -1,9 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-# Either:
+# Prints out the directory that contains the compose file(s) for specified
+# docker compose project:
 # a) Outputs the directory of the specified docker compose project,
 # b) If no argument, outputs the current directory if PWD is a docker compose project
 # c) Prompts the user to select a docker compose project and outputs its directory.
+
+# Check for bash 4 for `readarray` or associative arrays
+[ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
 
 #### Preamble (v2025-02-09)
 
@@ -41,7 +45,6 @@ if [[ -n "${1:-}" ]]; then
     proj="$1"
 
 else
-
     # If already in a project home, just return that
     if docker compose ps -q &>/dev/null; then
         echo '.'
@@ -57,12 +60,37 @@ else
     fi
 fi
 
-proj_dir=$(docker compose ls -a | sed -En "s,^${proj}[[:space:]]+.*[[:space:]](/.*.ya?ml)\$,\\1,p")
-proj_dir="${proj_dir%/*}"
+compose_files_string=$(docker compose ls -a | sed -En 's,^'"$proj"'[[:space:]]+.*[[:space:]](/.*\.ya?ml|[A-Z]:\\.*\.ya?ml)$,\1,p')
 
-if [[ ! -d "$proj_dir" ]]; then
-    echo "ERROR: No docker-compose project found." >&2
+IFS="," read -ra compose_files <<<"$compose_files_string"
+
+declare -A candidates
+
+for i in "${compose_files[@]}"; do
+    if [[ "$i" =~ ^[A-Z]:\\ ]]; then
+        proj_dir="${i%\\*}"
+        # Skip Windows directories for now
+        echo "⚠️ WARNING: Windows path not fully supported yet: $i" >&2
+    else
+        if [[ ! -f "$i" ]]; then
+            echo "⚠️ Compose file not found: $i" >&2
+        fi
+
+        proj_dir="${i%/*}"
+        if [[ ! -d "$proj_dir" ]]; then
+            echo "⚠️ Compose project directory not found: $proj_dir" >&2
+        fi
+    fi
+
+    candidates["$proj_dir"]=1
+done
+
+if [[ "${#candidates[@]}" -gt 1 ]]; then
+    echo "⚠️ WARNING: more than one docker-compose project found. Outputting the first." >&2
+elif [[ "${#candidates[@]}" -eq 0 ]]; then
+    echo "ERROR: no docker-compose project found" >&2
     exit 1
 fi
 
-echo "$proj_dir"
+set -- "${!candidates[@]}"
+echo "$1"
