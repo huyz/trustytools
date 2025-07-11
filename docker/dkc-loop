@@ -5,6 +5,8 @@
 # each iteration.
 # If no project is specified, defaults to the current directory if it's a project directory;
 # otherwise, prompts the user.
+#
+# NOTE: has special ssh code for WSL that only works for my setup.
 
 #### Preamble (v2025-02-09)
 
@@ -26,6 +28,18 @@ done
 SCRIPT_DIR="$(dirname "$script")"
 
 ##############################################################################
+#### Utils
+
+
+# For projects that have to be controlled from Windows (and not WSL shell)
+# due to bind mount filesystem mappings.
+function run_on_windows_host {
+    # First figure out the gateway IP address for this WSL host
+    gateway_ip="$(ip route | awk '/default/ { print $3 }')"
+    # Use docker at the host
+    ssh -i ~/.ssh/vm_host-id_ed25519 "$gateway_ip" -p 1022 "$@"
+}
+
 #### Main
 
 usage() {
@@ -59,5 +73,14 @@ shift
 cmd=("$@")
 
 for i in "${dirs[@]:-$(dkc-get-proj-dir)}"; do
-    DKC_PROJ_DIR="$i" "${cmd[@]}"
+    # If the directory is a Windows path
+    if [[ "$i" =~ ^[A-Z]:\\ ]]; then
+        # If we're on WSL
+        if [[ "${OS_RELEASE:-}" == *WSL ]]; then
+            DKC_PROJ_DIR="$i" "${cmd[@]}"
+        fi
+        echo "⚠️ WARNING: Windows paths are not properly supported yet: $i" >&2
+    else
+        DKC_PROJ_DIR="$i" "${cmd[@]}"
+    fi
 done
