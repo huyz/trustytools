@@ -6,24 +6,75 @@
 # Check for bash 4 for `readarray` or associative arrays
 [ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
 
-#### Preamble (v2025-02-09)
-
 set -euo pipefail
 shopt -s failglob
 # shellcheck disable=SC2317
 function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
 trap trap_err ERR
-trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
+trap exit INT
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+_install_cmd='brew install'
+if [[ $OSTYPE == darwin* ]]; then
+    if [[ "${EUID:-$UID}" -eq 0 ]]; then
+        _install_cmd='sudo port install'
+        MAC_PREFIX=/opt/local
+        [[ -x "${GETOPT:="$MAC_PREFIX/bin/getopt"}" ]] || \
+            { echo "$0: ERROR: \`$_install_cmd util-linux\` to install $GETOPT." >&2; exit 1; }
+    else
+        HOMEBREW_PREFIX="$( (/opt/homebrew/bin/brew --prefix || /usr/local/bin/brew --prefix || brew --prefix) 2>/dev/null)"
+        MAC_PREFIX="$HOMEBREW_PREFIX"
+        [[ -x "${GETOPT:="$MAC_PREFIX/opt/gnu-getopt/bin/getopt"}" ]] || \
+            { echo "$0: ERROR: \`$_install_cmd gnu-getopt\` to install $GETOPT." >&2; exit 1; }
+    fi
+    [[ -x "${REALPATH:="$MAC_PREFIX/bin/grealpath"}" ]] || \
+        { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $REALPATH." >&2; exit 1; }
+else
+    HOMEBREW_PREFIX="$( (/home/linuxbrew/.linuxbrew/bin/brew --prefix || brew --prefix) 2>/dev/null)"
+    GETOPT="getopt"
+    REALPATH="realpath"
+fi
 
 # shellcheck disable=SC2034
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
-script="${BASH_SOURCE[0]}"
-while [[ -L "$script" ]]; do
-    script="$(readlink "$script")"
-done
+# a) Uncomment to expand symlinks in order to find the proper .envrc for direnv
+#SCRIPT="$($REALPATH "${BASH_SOURCE[0]}")"
+# b) Uncomment in the general case
+SCRIPT="$($REALPATH --no-symlinks "${BASH_SOURCE[0]}")"
 # shellcheck disable=SC2034
-SCRIPT_DIR="$(dirname "$script")"
+SCRIPT_DIR="$(dirname "$SCRIPT")"
+
+#### Options
+
+# Defaults
+opt_dry_run=
+opt_verbose=
+#opt_argument=default
+
+function usage {
+    cat <<END >&2
+Usage: $SCRIPT_NAME [-h|--help] [-n|--dry-run] [-v|--verbose] [file...]
+        -h|--help: get help
+        -n|--dry-run: simulate write actions as much as possible
+        -v|--verbose: turn on verbose mode
+END
+    exit 1
+}
+
+#opts=$($GETOPT --options hnva: --long help,dry-run,verbose,argument: --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$($GETOPT --options hnv --long help,dry-run,verbose --name "$SCRIPT_NAME" -- "$@") || usage
+eval set -- "$opts"
+
+while true; do
+    case "$1" in
+        -h | --help) usage ;;
+        -n | --dry-run) opt_dry_run=opt_dry_run; shift ;;
+        -v | --verbose) opt_verbose=opt_verbose; shift ;;
+        #-a | --argument) opt_argument="$2"; shift 2 ;;
+        --) shift; break ;;
+        *) echo "$SCRIPT_NAME: INTERNAL ERROR: '$1'" >&2; exit 1 ;;
+    esac
+done
 
 ##############################################################################
 #### Config
@@ -51,13 +102,22 @@ echo "𐄫 Checking bind mounts:"
 round=1
 while [[ "${#services_to_check[@]}" -gt 0 ]]; do
     echo
-    echo "  𐄬 Round ${round}: ${#services_to_check[@]} service(s) to check…"
+    echo "𐄬 Round ${round}: ${#services_to_check[@]} service(s) to check…"
     for service in "${!services_to_check[@]}"; do
         srv_dir="$SRV_ROOT/$service"
 
         if [[ -d "$srv_dir" ]]; then
+            [[ -z "${opt_verbose:-}" ]] || echo "🔍 Checking $service in $srv_dir…"
+
+            readarray -t containers < <(cd "$srv_dir"; docker compose ps -q)
+            if [[ "${#containers[@]}" -eq 0 ]]; then
+                echo "  ❗️ $service: No containers found."
+                unset "services_to_check[$service]"
+                continue
+            fi
+
             # shellcheck disable=SC2046
-            readarray -t out < <(dk-bind-mount-mark-check $(cd "$srv_dir"; docker compose ps -q))
+            readarray -t out < <(dk-bind-mount-mark-check "${containers[@]}")
             ok_count=$(printf '%s\n' "${out[@]}" | grep -c OK || true)
             bad_count=$(printf '%s\n' "${out[@]}" | grep -c BAD || true)
             if [[ "$bad_count" -gt 0 ]]; then
@@ -67,9 +127,10 @@ while [[ "${#services_to_check[@]}" -gt 0 ]]; do
                 unset "services_to_check[$service]"
             fi
         elif [[ "$service" == *docker-extension* ]]; then
+            [[ -z "${opt_verbose:-}" ]] || echo "🙈 Skipping Docker extension: ${service}…"
             unset "services_to_check[$service]"
         else
-            echo "  ⚠️ Skipping $service (controlled at host)"
+            echo "⚠️ $service: project dir not found. (Controlled at host?) Skipping…"
             unset "services_to_check[$service]"
         fi
     done
