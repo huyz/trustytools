@@ -98,6 +98,11 @@ done
 
 #### Main
 
+
+echo "𐄫 Adding sentinels:"
+dk-bind-mount-mark
+
+echo
 echo "𐄫 Checking bind mounts:"
 round=1
 while [[ "${#services_to_check[@]}" -gt 0 ]]; do
