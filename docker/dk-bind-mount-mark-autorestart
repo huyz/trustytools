@@ -99,8 +99,15 @@ done
 #### Main
 
 
-echo "𐄫 Adding sentinels:"
-dk-bind-mount-mark
+if sudo -n true 2> /dev/null; then
+    echo
+    echo "𐄫 To check bind mounts, adding sentinels:"
+    dk-bind-mount-mark
+    echo
+else
+    echo
+    echo "𐄫 To avoid sudo prompt, assuming \`dk-bind-mount\` has already been run."
+fi
 
 echo
 echo "𐄫 Checking bind mounts:"
