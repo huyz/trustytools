@@ -3,4 +3,5 @@
 # A wrapper for `docker compose stop` that loops through the specified projects, or runs for the
 # current directory, or prompts for the project if necessary.
 
+echo "#❯" dkc-loop "$@" -- dkc stop
 exec dkc-loop "$@" -- dkc stop

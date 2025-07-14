@@ -74,12 +74,13 @@ cmd=("$@")
 
 for i in "${dirs[@]:-$(dkc-get-proj-dir)}"; do
     # If the directory is a Windows path
-    if [[ "$i" =~ ^[A-Z]:\\ ]]; then
+    if [[ "$i" =~ ^[A-Za-z]:\\ ]]; then
         # If we're on WSL
-        if [[ "${OS_RELEASE:-}" == *WSL ]]; then
-            DKC_PROJ_DIR="$i" "${cmd[@]}"
+        if [[ "${OS_RELEASE:-}" == *WSL* ]]; then
+            DKC_PROJ_DIR="$i" run_on_windows_host "${cmd[@]}"
+        else
+            echo "⚠️ WARNING: Windows paths are only supported on WSL: $i" >&2
         fi
-        echo "⚠️ WARNING: Windows paths are not properly supported yet: $i" >&2
     else
         DKC_PROJ_DIR="$i" "${cmd[@]}"
     fi

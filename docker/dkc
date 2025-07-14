@@ -4,4 +4,14 @@
 # This also functions as a helper script that grabs the project directory
 # from the `$DKC_PROJ_DIR` environment variable.
 
-exec docker compose --project-directory "${DKC_PROJ_DIR:-$(dkc-get-proj-dir)}" "$@"
+# NOTE: It's not enough to specify --project-directory; projects like seafile
+#   have .env files that reference compose YML files relative to the current
+#   directory
+proj_dir="${DKC_PROJ_DIR:-$(dkc-get-proj-dir)}"
+cd "$proj_dir" || {
+    echo "ERROR: Can't cd to project directory: $proj_dir" >&2
+    exit 1
+}
+
+echo "#❯" docker compose --project-directory "${proj_dir}" "$@"
+exec docker compose --project-directory "${proj_dir}" "$@"

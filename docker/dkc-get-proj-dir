@@ -67,18 +67,16 @@ IFS="," read -ra compose_files <<<"$compose_files_string"
 declare -A candidates
 
 for i in "${compose_files[@]}"; do
-    if [[ "$i" =~ ^[A-Z]:\\ ]]; then
+    if [[ "$i" =~ ^[A-Za-z]:\\ ]]; then
         proj_dir="${i%\\*}"
         # Skip Windows directories for now
         echo "⚠️ WARNING: Windows path not fully supported yet: $i" >&2
     else
-        if [[ ! -f "$i" ]]; then
-            echo "⚠️ Compose file not found: $i" >&2
-        fi
-
         proj_dir="${i%/*}"
         if [[ ! -d "$proj_dir" ]]; then
             echo "⚠️ Compose project directory not found: $proj_dir" >&2
+        elif [[ ! -f "$i" ]]; then
+            echo "⚠️ Compose file not found: $i" >&2
         fi
     fi
 

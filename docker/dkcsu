@@ -2,4 +2,5 @@
 # shellcheck shell=bash
 # Combines `dkcs` and `dkcsu` for each Docker Compose project.
 
+echo "#❯" dkc-loop "$@" -- bash -c 'dkc stop; dkc up -d --remove-orphans'
 exec dkc-loop "$@" -- bash -c 'dkc stop; dkc up -d --remove-orphans'

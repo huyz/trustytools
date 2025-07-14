@@ -47,7 +47,8 @@ fi
 original_dir="$PWD"
 cd "$proj_dir" || exit 1
 
-# By convention, the main container for an application has the shortest name.
+# By convention, the main container for an application has the shortest name because
+# the auxiliary containers should be named with the main app as the prefix.
 container="$(docker compose ps --format json | jq -r '.Name' | awk '{ print length, $0 }' | sort -n | cut -d" " -f2- | head -1)"
 
 if [[ -z "$container" ]]; then

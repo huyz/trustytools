@@ -3,4 +3,5 @@
 # A wrapper for `docker compose up -d --remove-orphans --force-recreate` that loops through the
 # specified projects, or runs for the current directory, or prompts for the project if necessary.
 
+echo "#❯" dkc-loop "$@" -- dkc up -d --remove-orphans --force-recreate
 exec dkc-loop "$@" -- dkc up -d --remove-orphans --force-recreate
