@@ -68,8 +68,8 @@ function container_cat {
     local container="$1" file="$2"
     shift
     local exit_code=0
-    #echo capture_cmd_output docker exec "$container" cat "$file" >&2
-    capture_cmd_output docker exec "$container" cat "$file" || exit_code="$?"
+    #echo capture_cmd_output docker exec "$container" /bin/cat "$file" >&2
+    capture_cmd_output docker exec "$container" /bin/cat "$file" || exit_code="$?"
     if [[ -n "$CAPTURED_STDOUT" && "$CAPTURED_STDOUT" == *'runtime exec failed'* ]]; then
         echo "  2️⃣ Container $container has no basic utilities; falling back to 'alpine nsenter'…" >&2
         # This container doesn't even have `test` or `cat` tools
