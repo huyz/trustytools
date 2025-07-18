@@ -64,7 +64,7 @@ compose_files_string=$(docker compose ls -a | sed -En 's,^'"$proj"'[[:space:]]+.
 
 IFS="," read -ra compose_files <<<"$compose_files_string"
 
-declare -A candidates
+declare -A candidates=()
 
 for i in "${compose_files[@]}"; do
     if [[ "$i" =~ ^[A-Za-z]:\\ ]]; then
