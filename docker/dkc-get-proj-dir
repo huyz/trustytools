@@ -45,8 +45,9 @@ if [[ -n "${1:-}" ]]; then
     proj="$1"
 
 else
-    # If already in a project home, just return that
-    if docker compose ps -q &>/dev/null; then
+    # If already in a project home, just return that.
+    # NOTE: we don't just look at exit code because it may be a valid project with a broken docker-compose.yml
+    if [[ "$(docker compose ps -q 2>&1)" != 'no configuration file provided' ]]; then
         echo '.'
         exit 0
     fi
