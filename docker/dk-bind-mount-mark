@@ -88,16 +88,21 @@ done | sort -u | while read -r src; do
         fallback_root="$proj_dir/.srv-bind-mount.d"
         fallback_src="$fallback_root/$sub_path"
 
+        # Delete remnants of a previous attempt at only using a file with no indirection
+        [[ -e "$fallback_src" && ! -d "$fallback_src" ]] && sudo rm -f "$fallback_src" 2>/dev/null | true
         # Make a fallback copy so that dk-bind-mount-mark-check can work without sudo
-        # for directories that containers (e.g. postgresql) restrict
+        # for directories that containers (e.g. postgresql) restrict.
         sudo mkdir -p "$fallback_src"
         sudo "$CHOWN" -R --reference="$proj_dir" "$fallback_root"
         sudo "$CHMOD" -R 755 "$fallback_root"
 
-        # Special case for service that can't handle dotfiles, e.g.
-        # https://github.com/offen/docker-volume-backup/issues/607
-        if [[ "$src" == */docker*volume*backup/conf* ]]; then
+        # Special case for services that can't handle dotfiles
+        #   - PostgreSQL will only initialize the data directory if it is empty
+        #   - DVB doesn't ignore dotfiles https://github.com/offen/docker-volume-backup/issues/607
+        if [[ "$src" == */pgdata || "$src" == */docker*volume*backup/conf* ]]; then
             for i in "$src/.srv-bind-mount" "$fallback_src/.srv-bind-mount"; do
+                # Delete remnants of a previous attempt at only using a file with no indirection
+                [[ -e "$i" && ! -d "$i" ]] && sudo rm -f "$i" 2>/dev/null || true
                 sudo mkdir -p "$i"
                 sudo "$CHOWN" --reference="$(dirname "$i")" "$i"
                 sudo "$CHMOD" 755 "$i"

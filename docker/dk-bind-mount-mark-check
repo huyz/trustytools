@@ -115,9 +115,10 @@ done | while IFS='|' read -r container_name rest; do
                         src="$fallback_root/$sub_path"
                     fi
 
-                    # Special case for dockervolumebackup which doesn't accept dotfiles at root:
-                    #   the sentinel file is nested in a same-named directory
-                    #   https://github.com/offen/docker-volume-backup/issues/607
+                    # Special case for apps that don't like dotfiles at root, in which case
+                    #   our sentinel file is nested in a same-named directory.
+                    #   - PostgreSQL will only initialize the data directory if it is empty
+                    #   - DVB doesn't ignore dotfiles https://github.com/offen/docker-volume-backup/issues/607
                     if [[ -d "$src/.srv-bind-mount" ]]; then
                         src="$src/.srv-bind-mount/.srv-bind-mount"
                         dst="$dst/.srv-bind-mount/.srv-bind-mount"
