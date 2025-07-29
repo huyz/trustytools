@@ -86,60 +86,64 @@ function container_cat {
 }
 
 for container in "${containers[@]}"; do
-    docker inspect -f '{{.Name}}|{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}={{.Destination}} {{end}}{{end}}' "$container" 2>/dev/null
-done | while IFS='|' read -r container_name rest; do
-    if [[ -n "$rest" ]]; then
-        container_name="${container_name#/}"
-        # Convert space-separated mounts to array
-        read -ra mounts <<< "$rest"
-        for mount in "${mounts[@]}"; do
-            [[ -n "$mount" ]] || continue
-            IFS='=' read -r src dst <<< "$mount"
-            [[ $src =~ ^"$SRV_ROOT"/ ]] || continue
+    readarray -t lines < <(docker inspect -f '{{.Name}}|{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}={{.Destination}} {{end}}{{end}}' "$container")
+    for line in "${lines[@]}"; do
+        IFS='|' read -r container_name rest <<< "$line"
+        if [[ -n "$rest" ]]; then
+            container_name="${container_name#/}"
+            # Convert space-separated mounts to array
+            read -ra mounts <<< "$rest"
+            for mount in "${mounts[@]}"; do
+                [[ -n "$mount" ]] || continue
+                IFS='=' read -r src dst <<< "$mount"
+                [[ $src =~ ^"$SRV_ROOT"/ ]] || continue
 
-            if [[ -d "$src" || -f "$src" ]]; then
-                check_container_running "$container_name" || continue
+                if [[ -d "$src" || -f "$src" ]]; then
+                    check_container_running "$container_name" || continue
 
-                if [[ -d "$src" ]]; then
-                    # Some containers (e.g. postgresql) restrict the directories and since we don't
-                    # want this script to run with sudo, we go to the fallback directory
-                    if [[ ! -r "$src/.srv-bind-mount" ]]; then
-                        proj_dir="${src#"$SRV_ROOT"/}"
-                        sub_path="${proj_dir#*/}"
-                        proj_dir="$SRV_ROOT/${proj_dir%%/*}"
-                        if [[ ! -d "$proj_dir" ]]; then
-                            echo "❗️ Project directory not found: ${proj_dir}…"
-                            continue
+                    if [[ -d "$src" ]]; then
+                        # Some containers (e.g. postgresql) restrict the directories and since we don't
+                        # want this script to run with sudo, we go to the fallback directory
+                        if [[ ! -r "$src/.srv-bind-mount" ]]; then
+                            proj_dir="${src#"$SRV_ROOT"/}"
+                            sub_path="${proj_dir#*/}"
+                            proj_dir="$SRV_ROOT/${proj_dir%%/*}"
+                            if [[ ! -d "$proj_dir" ]]; then
+                                echo "❗️ Project directory not found: ${proj_dir}…"
+                                continue
+                            fi
+                            fallback_root="$proj_dir/.srv-bind-mount.d"
+                            src="$fallback_root/$sub_path"
                         fi
-                        fallback_root="$proj_dir/.srv-bind-mount.d"
-                        src="$fallback_root/$sub_path"
+
+                        # Special case for apps that don't like dotfiles at root, in which case
+                        #   our sentinel file is nested in a same-named directory.
+                        #   - DVB doesn't ignore dotfiles https://github.com/offen/docker-volume-backup/issues/607
+                        if [[ -d "$src/.srv-bind-mount" ]]; then
+                            src="$src/.srv-bind-mount/.srv-bind-mount"
+                            dst="$dst/.srv-bind-mount/.srv-bind-mount"
+                        elif [[ -d "$src" ]]; then
+                            src="$src/.srv-bind-mount"
+                            dst="$dst/.srv-bind-mount"
+                        fi
+                        #echo "src=$src"
+                        #echo "dst=$dst"
                     fi
 
-                    # Special case for apps that don't like dotfiles at root, in which case
-                    #   our sentinel file is nested in a same-named directory.
-                    #   - PostgreSQL will only initialize the data directory if it is empty
-                    #   - DVB doesn't ignore dotfiles https://github.com/offen/docker-volume-backup/issues/607
-                    if [[ -d "$src/.srv-bind-mount" ]]; then
-                        src="$src/.srv-bind-mount/.srv-bind-mount"
-                        dst="$dst/.srv-bind-mount/.srv-bind-mount"
-                    elif [[ -d "$src" ]]; then
-                        src="$src/.srv-bind-mount"
-                        dst="$dst/.srv-bind-mount"
+                    # Special case:
+                    if [[ "$(head -n 1 "$src")" == "skip because empty" ]]; then
+                        echo "🙈 ${container_name}: Bind mount may be OK (we couldn't mark it because it was empty): $dst"
+                    elif cmp "$src" <(container_cat "$container_name" "$dst") &>/dev/null; then
+                        echo "✅ ${container_name}: Bind mount OK: $dst"
+                    else
+                        echo "❌️ ${container_name}: Bind mount BAD: $dst"
                     fi
-                    #echo "src=$src"
-                    #echo "dst=$dst"
-                fi
-
-                if cmp "$src" <(container_cat "$container_name" "$dst") &>/dev/null; then
-                    echo "✅ ${container_name}: Bind mount OK: $dst"
+                elif [[ -e "$src" ]]; then
+                    echo "  ⚠️ ${container_name}: Skipping non-directory: ${dst}…"
                 else
-                    echo "❌️ ${container_name}: Bind mount BAD: $dst"
+                    echo "  ❗️ ${container_name}: Local directory not found: ${src}…"
                 fi
-            elif [[ -e "$src" ]]; then
-                echo "  ⚠️ ${container_name}: Skipping non-directory: ${dst}…"
-            else
-                echo "  ❗️ ${container_name}: Local directory not found: ${src}…"
-            fi
-        done
-    fi
+            done
+        fi
+    done
 done

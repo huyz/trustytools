@@ -88,44 +88,50 @@ done | sort -u | while read -r src; do
         fallback_root="$proj_dir/.srv-bind-mount.d"
         fallback_src="$fallback_root/$sub_path"
 
-        # Delete remnants of a previous attempt at only using a file with no indirection
-        [[ -e "$fallback_src" && ! -d "$fallback_src" ]] && sudo rm -f "$fallback_src" 2>/dev/null | true
         # Make a fallback copy so that dk-bind-mount-mark-check can work without sudo
         # for directories that containers (e.g. postgresql) restrict.
         sudo mkdir -p "$fallback_src"
         sudo "$CHOWN" -R --reference="$proj_dir" "$fallback_root"
         sudo "$CHMOD" -R 755 "$fallback_root"
 
-        # Special case for services that can't handle dotfiles
-        #   - PostgreSQL will only initialize the data directory if it is empty
-        #   - DVB doesn't ignore dotfiles https://github.com/offen/docker-volume-backup/issues/607
-        if [[ "$src" == */pgdata || "$src" == */docker*volume*backup/conf* ]]; then
-            for i in "$src/.srv-bind-mount" "$fallback_src/.srv-bind-mount"; do
-                # Delete remnants of a previous attempt at only using a file with no indirection
-                [[ -e "$i" && ! -d "$i" ]] && sudo rm -f "$i" 2>/dev/null || true
-                sudo mkdir -p "$i"
-                sudo "$CHOWN" --reference="$(dirname "$i")" "$i"
-                sudo "$CHMOD" 755 "$i"
-            done
-            # NOTE: don't be confused; this references a file while the above references a subdir of a subdir
-            dst_path=".srv-bind-mount/.srv-bind-mount"
+        # Special treatment if the directory is empty; we don't want to be the first to write into it
+        # (PostgreSQL will only initialize the data directory if it is empty)
+        if [[ -z "$(sudo find "$src" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+            echo "📝 Noting empty bind mount: ${fallback_src}/${dst_path}…"
+            (echo "skip because empty"; date -Iseconds) > "$fallback_src/$dst_path"
         else
-            dst_path=".srv-bind-mount"
+            # Special case for services that can't handle dotfiles
+            #   - DVB doesn't ignore dotfiles https://github.com/offen/docker-volume-backup/issues/607
+            if [[ "$src" == */docker*volume*backup/conf* ]]; then
+                for i in "$src/.srv-bind-mount" "$fallback_src/.srv-bind-mount"; do
+                    # Delete remnants of a previous attempt at only using a file with no indirection
+                    if [[ -e "$i" && ! -d "$i" ]]; then
+                        sudo rm -f "$i" 2>/dev/null || true
+                    fi
+                    sudo mkdir -p "$i"
+                    sudo "$CHOWN" --reference="$(dirname "$i")" "$i"
+                    sudo "$CHMOD" 755 "$i"
+                done
+                # NOTE: don't be confused; this references a file while the above references a subdir of a subdir
+                dst_path=".srv-bind-mount/.srv-bind-mount"
+            else
+                dst_path=".srv-bind-mount"
+            fi
+
+            echo "✅ Marking bind mount: ${src}/${dst_path}…"
+            date -Iseconds | sudo sh -c "cat > '${src}/${dst_path}'"
+            sudo cp -a "$src/$dst_path" "$fallback_src/$dst_path"
+            # Change ownership and permissions to match the parent directory $src
+            # or some containers will try to change ownership/perms of this file
+            # and would fail to start up.
+            for i in "$src/$dst_path" "$fallback_src/$dst_path"; do
+                sudo "$CHOWN" --reference="$(dirname "$i")" "$i"
+                sudo "$CHMOD" 644 "$i"
+            done
         fi
 
-        echo "✅ Marking bind mount: ${src}/${dst_path}…"
-        date -Iseconds | sudo sh -c "cat > '${src}/${dst_path}'"
-        sudo cp -a "$src/$dst_path" "$fallback_src/$dst_path"
-        # Change ownership and permissions to match the parent directory $src
-        # or some containers will try to change ownership/perms of this file
-        # and would fail to start up.
-        for i in "$src/$dst_path" "$fallback_src/$dst_path"; do
-            sudo "$CHOWN" --reference="$(dirname "$i")" "$i"
-            sudo "$CHMOD" 644 "$i"
-        done
-
     elif [[ -f "$src" ]]; then
-        echo "🙈️ Skipping ordinary file: ${src}…"
+        echo "✅ No need to mark ordinary file: ${src}…"
     elif [[ -e "$src" ]]; then
         echo "⚠️ Skipping special file: ${src}…"
     else
