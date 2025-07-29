@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Mark all the bind mounts so that we know they hold our real data.
+# Mark all the bind mounts so that we know they hold our real data. This is mainly
+# needed with Docker Desktop for Windows which uses WSL and where bind mounts are unreliable.
+# Might be needed for macOS too since there's also a level of indirection from the real OS
+# in the form of a tiny VM.
 # This is used in conjunction with dk-bind-mount-mark-check to see if everything is properly mounted.
 
 # Check for bash 4 for `readarray` or associative arrays

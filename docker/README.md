@@ -50,11 +50,15 @@ The following tools are required for these scripts to work properly:
 
 ### Bind Mount Management
 
-- **`dk-bind-mount-mark`** - Mark bind mounts with timestamp files
+- **`dk-bind-mount-mark`** - Mark bind mounts with timestamp files for
+    `dk-bind-mount-mark-check` to verify (in particular for Docker Desktop for
+    Windows, which uses WSL and where bind mounts are unreliable)
   - Creates `.srv-bind-mount` files in bind mount directories
   - Usage: `dk-bind-mount-mark [container...]` (default: all containers)
 
 - **`dk-bind-mount-mark-check`** - Verify proper mounting of bind mounts
+    (in particular for Docker Desktop for Windows, which uses WSL and where bind mounts are
+    unreliable)
   - Checks if `.srv-bind-mount` files are accessible from containers
   - Usage: `dk-bind-mount-mark-check [container...]` (default: all containers)
 

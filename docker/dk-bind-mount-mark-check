@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Check the bind mounts for the specified containers (default: all)
+# This is mainly needed with Docker Desktop for Windows which uses WSL and where bind mounts are
+# unreliable. Might be needed for macOS too since there's also a level of indirection from the real
+# OS in the form of a tiny VM.
+# dk-bind-mount-mark must be called first.
 
 # Check for bash 4 for `readarray` or associative arrays
 [ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
