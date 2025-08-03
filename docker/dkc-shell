@@ -34,7 +34,7 @@ if [[ "${1:-}" == '--help' || "${1:-}" == '-h' ]]; then
     exit 0
 fi
 
-if ! proj_dir=$(dkc-get-proj-dir "${1:-}"); then
+if ! proj_dir=$(dkc-project-where "${1:-}"); then
     echo "ERROR: could not determine Docker Compose project directory." >&2
     exit 1
 fi

@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+#
 # Prints out the directory that contains the compose file(s) for specified
 # docker compose project:
 # a) Outputs the directory of the specified docker compose project,
-# b) If no argument, outputs the current directory if PWD is a docker compose project
+# b) If no argument, outputs the current directory if $PWD is a docker compose project
 # c) Prompts the user to select a docker compose project and outputs its directory.
+#
+# By default, only considers projects that `docker compose` knows about. To expand
+# the search to all projects in the filesystem, use `--all` option, and either
+# specify the $STACKS_ROOT environment variable or use `--root` option to specify the root directory
+# (e.g. `-r /opt/stacks`)
 
 # Check for bash 4 for `readarray` or associative arrays
 [ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }

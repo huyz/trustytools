@@ -60,7 +60,7 @@ fi
 dirs=()
 while [[ $# -gt 0 ]]; do
     [[ "$1" == '--' ]] && break
-    dirs+=("$(dkc-get-proj-dir "$1")")
+    dirs+=("$(dkc-project-where "$1")")
     shift
 done
 
@@ -72,7 +72,7 @@ fi
 shift
 cmd=("$@")
 
-for i in "${dirs[@]:-$(dkc-get-proj-dir)}"; do
+for i in "${dirs[@]:-$(dkc-project-where)}"; do
     # If the directory is a Windows path
     if [[ "$i" =~ ^[A-Za-z]:\\ ]]; then
         # If we're on WSL

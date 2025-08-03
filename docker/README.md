@@ -108,9 +108,10 @@ The following tools are required for these scripts to work properly:
 
 ### Helper Utilities
 
-- **`dkc-get-proj-dir`** - Helper script to get Docker Compose project directory
-  - Returns current directory if already in a project
-  - Otherwise prompts with fzf to select from available projects
+- **`dkc-project-where`** - Helper script to get Docker Compose project directory
+  - Returns directory of specified project, or
+  - returns current directory if already in a project, or
+  - prompts with fzf to select from available projects
 
 - **`dkc-loop`** - Helper to execute commands across multiple Compose projects
   - Usage: `dkc-loop [project...] -- command [args...]`

@@ -7,7 +7,7 @@
 # NOTE: It's not enough to specify --project-directory; projects like seafile
 #   have .env files that reference compose YML files relative to the current
 #   directory
-proj_dir="${DKC_PROJ_DIR:-$(dkc-get-proj-dir)}"
+proj_dir="${DKC_PROJ_DIR:-$(dkc-project-where)}"
 cd "$proj_dir" || {
     echo "ERROR: Can't cd to project directory: $proj_dir" >&2
     exit 1
