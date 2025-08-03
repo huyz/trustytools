@@ -9,6 +9,9 @@
 # Check for bash 4 for `readarray` or associative arrays
 [ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
 
+#!/bin/bash
+# shellcheck shell=bash
+
 #### Preamble (v2025-02-09)
 
 set -euo pipefail
@@ -19,49 +22,124 @@ trap trap_err ERR
 trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
+_install_cmd='brew install'
+if [[ $OSTYPE == darwin* ]]; then
+    if [[ "${EUID:-$UID}" -eq 0 ]]; then
+        _install_cmd='sudo port install'
+        MAC_PREFIX=/opt/local
+        [[ -x "${GETOPT:="$MAC_PREFIX/bin/getopt"}" ]] || \
+            { echo "$0: ERROR: \`$_install_cmd util-linux\` to install $GETOPT." >&2; exit 1; }
+    else
+        HOMEBREW_PREFIX="$( (/opt/homebrew/bin/brew --prefix || /usr/local/bin/brew --prefix || brew --prefix) 2>/dev/null)"
+        MAC_PREFIX="$HOMEBREW_PREFIX"
+        [[ -x "${GETOPT:="$MAC_PREFIX/opt/gnu-getopt/bin/getopt"}" ]] || \
+            { echo "$0: ERROR: \`$_install_cmd gnu-getopt\` to install $GETOPT." >&2; exit 1; }
+    fi
+    [[ -x "${REALPATH:="$MAC_PREFIX/bin/grealpath"}" ]] || \
+        { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $REALPATH." >&2; exit 1; }
+else
+    HOMEBREW_PREFIX="$( (/home/linuxbrew/.linuxbrew/bin/brew --prefix || brew --prefix) 2>/dev/null)"
+    GETOPT="getopt"
+    REALPATH="realpath"
+fi
+
 # shellcheck disable=SC2034
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
-script="${BASH_SOURCE[0]}"
-while [[ -L "$script" ]]; do
-    script="$(readlink "$script")"
-done
+# a) Uncomment to expand symlinks in order to find the proper .envrc for direnv
+#SCRIPT="$($REALPATH "${BASH_SOURCE[0]}")"
+# b) Uncomment in the general case
+SCRIPT="$($REALPATH --no-symlinks "${BASH_SOURCE[0]}")"
 # shellcheck disable=SC2034
-SCRIPT_DIR="$(dirname "$script")"
+SCRIPT_DIR="$(dirname "$SCRIPT")"
+
+##############################################################################
+#### Config
+
+STACKS_ROOT="${STACKS_ROOT:-/opt/stacks}"
+
+#### Options
+
+# Defaults
+opt_all=
+opt_root="$STACKS_ROOT"
+
+function usage {
+    local exit_code="${1:-1}"
+    cat <<END >&2
+Usage: $SCRIPT_NAME [-a|--all [-r|--root project_root]] [compose_project]
+        -h|--help: get help
+        -a|--all: include all projects found in filesystem.
+            Default: only projects listed by \`docker compose\`
+        -r|--root: specify the root directory for the projects (to be used with --all).
+            Default: $opt_root
+
+        Outputs the directory of:
+        1) the given docker compose project, if specified at the command line, or
+        2) the current directory if it is a docker compose project, or
+        3) the project interactively selected by the user from the list of found projects
+END
+    exit "$exit_code"
+}
+
+opts=$($GETOPT --options ha,r: --long help,all,root: --name "$SCRIPT_NAME" -- "$@") || usage
+eval set -- "$opts"
+
+while true; do
+    case "$1" in
+        -h | --help) usage 0 ;;
+        -a | --all) opt_all=opt_all; shift ;;
+        -r | --root) opt_root="$2"; shift 2 ;;
+        --) shift; break ;;
+        *) echo "$SCRIPT_NAME: INTERNAL ERROR: '$1'" >&2; exit 1 ;;
+    esac
+done
+
+if [[ $# -gt 1 ]]; then
+    usage
+fi
 
 ##############################################################################
 #### Main
 
-if [[ "${1:-}" == '--help' || "${1:-}" == '-h' || $# -gt 1 ]]; then
-    echo "Usage: $SCRIPT_NAME [project_name]"
-    echo "  Outputs the directory of the specified docker compose project."
-    echo "  Or if no argument, outputs the current directory if in a project."
-    echo "  Otherwise, prompts to select a project from the list."
-    exit 0
-fi
-
-
 if [[ -n "${1:-}" ]]; then
     # If an argument is provided, use it as the project name
-    proj="$1"
+    project="$1"
 
 else
     # If already in a project home, just return that.
-    # NOTE: we don't just look at exit code because it may be a valid project with a broken docker-compose.yml
-    if [[ "$(docker compose ps -q 2>&1)" != 'no configuration file provided' ]]; then
+    # NOTE: seafile doesn't use docker-compoose.yml or compose.yaml; it specifies filenames in .env
+    if [[ -f "docker-compose.yml" || -f "compose.yaml" ]] || grep -q '^COMPOSE_FILE=' .env 2>/dev/null; then
         echo '.'
         exit 0
     fi
 
     # Get the list of all the known docker compose projects and prompt
     # the user to select one.
-    proj=$(docker compose ls -aq | fzf --tac || true)
-    if [[ -z "$proj" ]]; then
-        echo "ERROR: No docker-compose project selected." >&2
+    if [[ -n "$opt_all" ]]; then
+        # Find all docker compose projects in the specified root directory
+        readarray -t project_dirs < <(
+            find "$opt_root" -maxdepth 2 -type f \( -name 'docker-compose.yml' -o -name 'compose.yaml' -o -name '.env' \) -exec dirname {} \; 2>/dev/null \
+            | sort -u || true)
+        if [[ "${#project_dirs[@]}" -eq 0 ]]; then
+            echo "ERROR: No docker compose projects found in '$opt_root'." >&2
+            exit 1
+        fi
+        projects=()
+        for dir in "${project_dirs[@]}"; do
+            projects+=("$(basename "$dir")")
+        done
+    else
+        readarray -t projects < <(docker compose ls -aq || true)
+    fi
+
+    project=$(printf "%s\n" "${projects[@]}" | fzf --tac || true)
+    if [[ -z "$project" ]]; then
+        echo "ERROR: No docker compose project selected." >&2
         exit 1
     fi
 fi
 
-compose_files_string=$(docker compose ls -a | sed -En 's,^'"$proj"'[[:space:]]+.*[[:space:]](/.*\.ya?ml|[A-Z]:\\.*\.ya?ml)$,\1,p')
+compose_files_string=$(docker compose ls -a | sed -En 's,^'"$project"'[[:space:]]+.*[[:space:]](/.*\.ya?ml|[A-Z]:\\.*\.ya?ml)$,\1,p')
 
 IFS="," read -ra compose_files <<<"$compose_files_string"
 
@@ -87,8 +165,13 @@ done
 if [[ "${#candidates[@]}" -gt 1 ]]; then
     echo "⚠️ WARNING: more than one docker-compose project found. Outputting the first." >&2
 elif [[ "${#candidates[@]}" -eq 0 ]]; then
-    echo "ERROR: no docker-compose project found" >&2
-    exit 1
+    if [[ -n $opt_all ]] && cd "$opt_root/$project" 2>/dev/null \
+        && ( [[ -f "docker-compose.yml" || -f "compose.yaml" ]] || grep -q '^COMPOSE_FILE=' .env 2>/dev/null ); then
+        candidates["$opt_root/$project"]=1
+    else
+        echo "ERROR: no docker-compose project found" >&2
+        exit 1
+    fi
 fi
 
 set -- "${!candidates[@]}"
