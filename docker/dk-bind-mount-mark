@@ -103,7 +103,7 @@ done | sort -u | while read -r src; do
             echo "📝 Noting empty bind mount: ${fallback_src}/${dst_path}…"
             (echo "skip because empty"; date -Iseconds) > "$fallback_src/$dst_path"
         else
-            # Special case for services that can't handle dotfiles
+            # Special case for projects that can't handle dotfiles
             #   - DVB doesn't ignore dotfiles https://github.com/offen/docker-volume-backup/issues/607
             if [[ "$src" == */docker*volume*backup/conf* ]]; then
                 for i in "$src/.srv-bind-mount" "$fallback_src/.srv-bind-mount"; do

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Check the bind mounts for the specified Docker Compose projects (default: all) and
-# restart the services until the bind mounts are correct.
+# restart the projects until the bind mounts are correct.
 
 # Check for bash 4 for `readarray` or associative arrays
 [ "${BASH_VERSINFO:-0}" -ge 4 ] || { echo "${BASH_SOURCE[0]}: ERROR: bash v4+ required." >&2; exit 1; }
@@ -91,9 +91,9 @@ if [[ $# -eq 0 ]]; then
     set -- $(docker compose ls -aq || true)
 fi
 
-declare -A services_to_check
+declare -A projects_to_check
 for i in "$@"; do
-    services_to_check["$i"]=1
+    projects_to_check["$i"]=1
 done
 
 #### Main
@@ -112,19 +112,19 @@ fi
 echo
 echo "𐄫 Checking bind mounts:"
 round=1
-while [[ "${#services_to_check[@]}" -gt 0 ]]; do
+while [[ "${#projects_to_check[@]}" -gt 0 ]]; do
     echo
-    echo "𐄬 Round ${round}: ${#services_to_check[@]} service(s) to check…"
-    for service in "${!services_to_check[@]}"; do
-        srv_dir="$SRV_ROOT/$service"
+    echo "𐄬 Round ${round}: ${#projects_to_check[@]} project(s) to check…"
+    for project in "${!projects_to_check[@]}"; do
+        srv_dir="$SRV_ROOT/$project"
 
         if [[ -d "$srv_dir" ]]; then
-            [[ -z "${opt_verbose:-}" ]] || echo "🔍 Checking $service in $srv_dir…"
+            [[ -z "${opt_verbose:-}" ]] || echo "🔍 Checking $project in $srv_dir…"
 
             readarray -t containers < <(cd "$srv_dir"; docker compose ps -q)
             if [[ "${#containers[@]}" -eq 0 ]]; then
-                echo "  ❗️ $service: No containers found."
-                unset "services_to_check[$service]"
+                echo "  ❗️ $project: No containers found."
+                unset "projects_to_check[$project]"
                 continue
             fi
 
@@ -133,21 +133,21 @@ while [[ "${#services_to_check[@]}" -gt 0 ]]; do
             ok_count=$(printf '%s\n' "${out[@]}" | grep -c OK || true)
             bad_count=$(printf '%s\n' "${out[@]}" | grep -c BAD || true)
             if [[ "$bad_count" -gt 0 ]]; then
-                echo "  ❌ $service: $bad_count bind mount(s) not ready ($ok_count OK). Restarting…"
-                dkcsu "$service"
+                echo "  ❌ $project: $bad_count bind mount(s) not ready ($ok_count OK). Restarting…"
+                dkcsu "$project"
             else
-                unset "services_to_check[$service]"
+                unset "projects_to_check[$project]"
             fi
-        elif [[ "$service" == *docker-extension* ]]; then
-            [[ -z "${opt_verbose:-}" ]] || echo "🙈 Skipping Docker extension: ${service}…"
-            unset "services_to_check[$service]"
+        elif [[ "$project" == *docker-extension* ]]; then
+            [[ -z "${opt_verbose:-}" ]] || echo "🙈 Skipping Docker extension: ${project}…"
+            unset "projects_to_check[$project]"
         else
-            echo "⚠️ $service: project dir not found. (Controlled at host?) Skipping…"
-            unset "services_to_check[$service]"
+            echo "⚠️ $project: project dir not found. (Controlled at host?) Skipping…"
+            unset "projects_to_check[$project]"
         fi
     done
 
-    if [[ "${#services_to_check[@]}" -gt 0 ]]; then
+    if [[ "${#projects_to_check[@]}" -gt 0 ]]; then
         sleep 5
         (( round++ ))
     fi
