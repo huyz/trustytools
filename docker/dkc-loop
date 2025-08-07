@@ -60,9 +60,18 @@ fi
 dirs=()
 while [[ $# -gt 0 ]]; do
     [[ "$1" == '--' ]] && break
-    dirs+=("$(dkc-project-where "$1")")
+    if ! dir=$(dkc-project-where "$1"); then
+        exit $?
+    fi
+    dirs+=("$dir")
     shift
 done
+if [[ ${#dirs[@]} -eq 0 ]]; then
+    if ! dir=$(dkc-project-where "$1"); then
+        exit $?
+    fi
+    dirs+=("$dir")
+fi
 
 if [[ "${1:-}" != '--' || $# -lt 2 ]]; then
     echo "$SCRIPT_NAME: ERROR: Expected '--' before command." >&2
@@ -72,7 +81,7 @@ fi
 shift
 cmd=("$@")
 
-for i in "${dirs[@]:-$(dkc-project-where)}"; do
+for i in "${dirs[@]}"; do
     # If the directory is a Windows path
     if [[ "$i" =~ ^[A-Za-z]:\\ ]]; then
         # If we're on WSL
