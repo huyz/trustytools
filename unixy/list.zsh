@@ -132,7 +132,8 @@ for i in "$@"; do
         *.gz|*.z|*.Z) command="$command gunzip -c |" ;;
         *.bz2) command="$command bunzip2 -c |" ;;
         *.xz) command="$command unxz -c |" ;;
-        *.tar) command="$command tar -tvf - |"; break ;;
+        # Ignore zeros so we can list concatenated tar files
+        *.tar) command="$command tar -tvf - --ignore-zeros |"; break ;;
         *.jar|*.war|*.ear)
           command="$command `_wrap_stdin 'jar -tvf'` |"
           break
