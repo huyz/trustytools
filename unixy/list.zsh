@@ -30,6 +30,9 @@ _LESS=$(perl -pe 's/-e\b\s*//' <<< "$LESS")
 # e.g. long lines might be split in the wrong place
 _LESS="${_LESS} -r"
 
+[[ -n "$DEBUG" ]] && echo "LESS='$_LESS'"
+export LESS="$_LESS"
+
 ### Wrapper for commands that don't take standard input
 
 _wrap_stdin()
@@ -207,8 +210,8 @@ for i in "$@"; do
       filename="${${filename%.*}%,v}"
     done
 
-    [[ -n $DEBUG ]] && echo "Command=LESS=\"$_LESS\" $command less $_lessargs"
-    eval "LESS=\"$_LESS\" $command less $_lessargs"
+    [[ -n $DEBUG ]] && echo "#❯ $command less $_lessargs"
+    eval "$command less $_lessargs"
   fi
 done
 
