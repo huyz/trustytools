@@ -130,13 +130,12 @@ for i in "$@"; do
 
         # Compression and archival
         *.pgp) command="$command pgp -f |" ;;
-        *.tgz) command="$command gunzip -c | tar -tvf - |"; break ;;
-        *.tbz|*.tbz2) command="$command bunzip2 -c | tar -tvf - |"; break ;;
-        *.tx) command="$command unxz -c | tar -tvf - |"; break ;;
+        *.tgz) command="$command gunzip -c | tar -tvf - --ignore-zeros |"; break ;;
+        *.tbz|*.tbz2) command="$command bunzip2 -c | tar -tvf - --ignore-zeros |"; break ;;
+        *.tx) command="$command unxz -c | tar -tvf - --ignore-zeros |"; break ;;
         *.gz|*.z|*.Z) command="$command gunzip -c |" ;;
         *.bz2) command="$command bunzip2 -c |" ;;
         *.xz) command="$command unxz -c |" ;;
-        # Ignore zeros so we can list concatenated tar files
         *.tar) command="$command tar -tvf - --ignore-zeros |"; break ;;
         *.jar|*.war|*.ear)
           command="$command `_wrap_stdin 'jar -tvf'` |"
