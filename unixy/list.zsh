@@ -22,12 +22,13 @@ umask 077
 
 # We want to remove the e option, because we don't want to exit until 'q'
 # is hit.
-_LESS="`echo \"$LESS\" | sed 's/e//'`"
+# NOTE: this won't find -e if it's merged with other single-letter flags
+_LESS=$(perl -pe 's/-e\b\s*//' <<< "$LESS")
 
 # -r option is to display raw characters, e.g. bold in man pages.
 # ALERT! screen display might be messed up (like man page says),
 # e.g. long lines might be split in the wrong place
-_LESS="${_LESS}r"
+_LESS="${_LESS} -r"
 
 ### Wrapper for commands that don't take standard input
 
