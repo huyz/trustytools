@@ -64,4 +64,4 @@ fi
 vault-kv-search --search=path "${1:-$DEFAULT_MOUNT_POINT}" -r . --json \
     | jq -r .path \
     | sort -ru \
-    | fzf --preview 'vault kv get --format=yaml ${}'
+    | fzf --preview 'vault kv get --format=yaml ${}' --preview-window down --preview-window wrap
