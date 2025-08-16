@@ -75,7 +75,7 @@ function container_cat {
     #echo capture_cmd_output docker exec "$container" /bin/cat "$file" >&2
     capture_cmd_output docker exec "$container" /bin/cat "$file" || exit_code="$?"
     if [[ -n "$CAPTURED_STDOUT" && "$CAPTURED_STDOUT" == *'runtime exec failed'* ]]; then
-        echo "  2️⃣ Container $container has no basic utilities; falling back to 'alpine nsenter'…" >&2
+        echo "  🔙 Container $container has no basic utilities; falling back to 'alpine nsenter'…" >&2
         # This container doesn't even have `test` or `cat` tools
         # so try again with a helper container
         pid=$(docker inspect --format '{{.State.Pid}}' "$container")
