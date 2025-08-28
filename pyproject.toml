@@ -1,0 +1,8 @@
+# Just for tools (used by IDEs)
+
+[tool.ruff]
+line-length = 120  # Default is 88
+
+[tool.ruff.lint]
+#select = ["F", "E", "W", "C", "I", "N"]
+ignore = ["F541"]  # Ignore unused variable in f-string
