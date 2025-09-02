@@ -30,7 +30,7 @@
 
 set -euo pipefail
 shopt -s failglob
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function trap_err { echo "ERR signal on line $(caller)" >&2; }
 trap trap_err ERR
 trap exit INT
@@ -139,11 +139,11 @@ function run_cmd {
     [[ -n ${opt_dry_run-} ]] || "$@"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function warn { printf "$SCRIPT_NAME: WARNING: %s\n" "$@" >&2; }
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function err { printf "$SCRIPT_NAME: ERROR: %s\n" "$@" >&2; }
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function abort { printf "$SCRIPT_NAME: FATAL: %s\n" "$@" >&2; exit 1; }
 
 

@@ -45,7 +45,7 @@
 
 set -euo pipefail
 shopt -s failglob
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function trap_err { echo "ERR signal on line $(caller)" >&2; }
 trap trap_err ERR
 trap exit INT
@@ -130,21 +130,21 @@ filenames=("$@")
 
 #### Utils
 
-# shellcheck disable=SC2317 disable=SC2120
+# shellcheck disable=SC2329 disable=SC2120
 function indent_stdout {
     local prefix=
     [[ $# -gt 0 &&${1:-} == -p ]] && { prefix="$2"; shift 2; }
     perl -pe "s/^/${prefix}░░░░/"
 }
 
-# shellcheck disable=SC2317 disable=SC2120
+# shellcheck disable=SC2329 disable=SC2120
 function indent_stderr {
     local prefix=
     [[ ${1:-} == -p ]] && { prefix="$2"; shift 2; }
     perl -ne "s/^/${prefix}░░░░/; print STDERR"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function printf_log {
     # shellcheck disable=SC2059
     printf -- "$@"
@@ -152,7 +152,7 @@ function printf_log {
     [[ -z ${LOG_FILE-} ]] || printf -- "$@" >> "$LOG_FILE"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function printf_err_log {
     # shellcheck disable=SC2059
     printf -- "$@" >&2
@@ -165,23 +165,23 @@ function printf_err_log {
     fi
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function run_cmd {
     [[ -z ${opt_verbose-} ]] || printf_log "#❯%s\n" "$(printf " %q" "$@")" || true
     [[ -n ${opt_dry_run-} ]] || "$@"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function warn {
     printf_err_log "$SCRIPT_NAME: WARNING: $*\n"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function error {
     printf_err_log "$SCRIPT_NAME: ERROR: $*\n"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function abort {
     printf_err_log "$SCRIPT_NAME: FATAL: $*\n"
     exit 1

@@ -8,7 +8,7 @@
 
 set -euo pipefail
 shopt -s failglob
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function trap_err { echo "ERR signal on line $(caller)" >&2; }
 trap trap_err ERR
 trap exit INT

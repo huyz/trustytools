@@ -12,7 +12,7 @@
 
 set -euo pipefail
 shopt -s failglob
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
 trap trap_err ERR
 trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
