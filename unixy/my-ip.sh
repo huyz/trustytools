@@ -5,6 +5,7 @@
 
 if [[ ${1-} == -v ]]; then
     opt_verbose=1
+    shift
 fi
 
 #### util
@@ -18,10 +19,11 @@ function query {
 
 #### Main
 
+#query "$(dig txt +short o-o.myaddr.google.com @1.1.1.1 | sed -n 's/"\(.*\)"/\1/p')"
 query "$(dig txt ch +short whoami.cloudflare @1.1.1.1 | sed -n 's/"\(.*\)"/\1/p')"
 
-if command -v curl &>/dev/null; then
-    if [[ -z $ip || -n ${opt_verbose-} ]]; then
+if [[ -z $ip || -n ${opt_verbose-} ]]; then
+    if command -v curl &>/dev/null; then
         # Timeout: 2 seconds
         query "$(curl -s -m 2 ipinfo.io | sed -n 's/.*"ip":.*"\(.*\)".*/\1/p')"
     fi
