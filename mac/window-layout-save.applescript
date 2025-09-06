@@ -266,11 +266,11 @@ on run
                                 set outputScript to outputScript & "        set windowList to {}\n"
                                 set outputScript to outputScript & "        repeat with winRecord in sortedWindows\n"
                                 set outputScript to outputScript & "            set end of windowList to windowRef of winRecord\n"
-                                set outputScript to outputScript & "        end repeat\n\n"
+                                set outputScript to outputScript & "        end repeat\n"
                             end if
 
-                            set outputScript to outputScript & "    on error\n"
-                            set outputScript to outputScript & "        log \"  [!] Failed to get windows for " & bundleId & "\"\n"
+                            set outputScript to outputScript & "    on error errorMsg\n"
+                            set outputScript to outputScript & "        log \"  [!] Failed to get windows for " & bundleId & ": \" & errorMsg\n"
                             set outputScript to outputScript & "        set windowList to {}\n"
                             set outputScript to outputScript & "    end try\n"
                             set outputScript to outputScript & "    repeat with windowIndex from 1 to (count of windowList)\n"
