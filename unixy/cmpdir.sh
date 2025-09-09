@@ -26,16 +26,19 @@ trap exit INT  # So that ^C will stop the entire script, not just the current su
 ### Check arguments
 
 usage() {
-    echo "Usage: $0 [-c] [-i] source_dir target_dir" >&2
+    echo "Usage: $0 [-t] [-c] [-i] source_dir target_dir" >&2
+    echo "       -t : compare filesize only (and not timestamp)" >&2
     echo "       -c : compare checksums (instead of just filesize and timestamp)" >&2
     echo "       -i : ignore extra files at the destination" >&2
     exit 1
 }
 
+opt_ignore_time=
 opt_checksum=
 opt_delete=--delete
 while [[ $# -gt 2 ]]; do
     case "${1:-}" in
+        -t) opt_ignore_time=1 ;;
         -c) opt_checksum="$1" ;;
         -i) opt_delete= ;;
         *) usage ;;
@@ -134,7 +137,7 @@ exec &> >(tee "$tmpfile")
 ### Execute
 
 set -x
-exec rsync --dry-run --itemize-changes -aH \
+cmd=(rsync --dry-run --itemize-changes --archive --hard-links \
     ${opt_checksum:+"$opt_checksum"} \
     ${opt_delete:+"$opt_delete"} \
     --exclude='.DS_Store' \
@@ -145,4 +148,10 @@ exec rsync --dry-run --itemize-changes -aH \
     --exclude='.vscode' \
     --exclude='node_modules' \
     --exclude='venv' \
-    "$src" "$tar"
+    "$src" "$tar")
+
+if [[ -n "$opt_ignore_time" ]]; then
+    "${cmd[@]}" | grep -v '^[.>][df]\.\.t\.* '
+else
+    "${cmd[@]}"
+fi
