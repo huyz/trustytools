@@ -288,7 +288,7 @@ if command -v "$WGET" &>/dev/null; then
 fi
 
 if command -v "$OPENSSL" &>/dev/null; then
-    ## 2025-09-17 This cafe blocks port 992?
+    ## 2025-09-17 Doesn't work; I get "Connection refused"
     for host in \
         ident.me:992 \
     ; do
