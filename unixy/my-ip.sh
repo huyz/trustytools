@@ -239,9 +239,10 @@ for web_command in "$CURL"; do
             *curl) flags=("${CURL_FLAGS[@]}") ;;
             *wget) flags=("${WGET_FLAGS[@]}") ;;
         esac
-        # 2025-09-17 Don't use https for ipinfo as their SSL cert expired today
+        # 2025-09-17 ipinfo: temporarily used http instead of https, as their LetsEncrypt SSL cert
+        #   expired for several hours
         for url in \
-            http://ipinfo.io/ip \
+            https://ipinfo.io/ip \
             https://api64.ipify.org \
             https://ident.me \
         ; do
