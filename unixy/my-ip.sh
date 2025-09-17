@@ -69,8 +69,11 @@ done
 ##############################################################################
 #### Config
 
+# shellcheck disable=SC2034
 flag_any=
+# shellcheck disable=SC2034
 flag_ipv4=-4
+# shellcheck disable=SC2034
 flag_ipv6=-6
 
 CURL_FLAGS=(--silent --fail --max-time 2)
