@@ -245,8 +245,9 @@ for web_command in "$CURL"; do
         # 2025-09-17 ipinfo: temporarily used http instead of https, as their LetsEncrypt SSL cert
         #   expired for several hours
         for url in \
-            https://ipinfo.io/ip \
+            https://ifconfig.me \
             https://api64.ipify.org \
+            https://ipinfo.io/ip \
             https://ident.me \
         ; do
             provider=$(echo -n "$url" | perl -lpe 's/.*?(?:^|[-\w]+\.|.*:\/\/)+?((?!com|org|me|io)\w+)(?:\.com|\.org|\.me|\.io)?(?:\/.*)?$/$1/')
