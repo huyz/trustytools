@@ -1,6 +1,7 @@
 #!/bin/bash
 # Return success if given app is running
 # If the name of the app has two or more dots, it's assumed to be the bundle identifier.
+# If the name is a path, everything is stripped to the basename without the .app suffix.
 
 
 #### Preamble (v2023-08-28)
@@ -28,7 +29,11 @@ fi
 
 app="$1"
 
-if [[ "$app" == *.*.* ]]; then
+if [[ "$app" == /* ]]; then
+    app="$(basename "$app")"
+    app="${app%.app}"
+    property="name"
+elif [[ "$app" == *.*.* ]]; then
     property="bundle identifier"
 elif [[ "$app" == "iTerm2" ]]; then
     # Running process shows up as "iTerm"
