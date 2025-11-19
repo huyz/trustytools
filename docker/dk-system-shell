@@ -24,4 +24,5 @@ if [[ $# -eq 0 ]]; then
     it="-it"
 fi
 
+echo "#❯ docker run --rm $it --privileged --pid=host justincormack/nsenter1 $*"
 exec docker run --rm $it --privileged --pid=host justincormack/nsenter1 "$@"
