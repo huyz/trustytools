@@ -30,17 +30,31 @@ done
 # shellcheck disable=SC2034
 SCRIPT_DIR=$(dirname "$script")
 
+#### Utils
+
+# shellcheck disable=SC2329
+function debug { [[ -z ${opt_debug-} ]] || printf "$SCRIPT_NAME: 🔧 DEBUG: %s\n" "$@" >&2; }
+# shellcheck disable=SC2329
+function info { [[ -z ${opt_verbose-} ]] || printf "%s\n" "$@" >&2; }
+# shellcheck disable=SC2329
+function warn { printf "$SCRIPT_NAME: ⚠️ WARNING: %s\n" "$@" >&2; }
+# shellcheck disable=SC2329
+function err { printf "$SCRIPT_NAME: ❗ ERROR: %s\n" "$@" >&2; }
+# shellcheck disable=SC2329
+function abort { printf "$SCRIPT_NAME: ❌ ERROR: %s\n" "$@" >&2; exit 1; }
+
 #### Options
 
 # Defaults
 opt_verbose=
+opt_debug=
 opt_ipv4=
 opt_ipv6=
 
 function usage {
     local exit_code="${1:-1}"
     cat <<END >&2
-Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [file...]
+Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-4] [-6]
         -h|--help: get help
         -v|--verbose: turn on verbose mode
         -4: use IPv4 only
@@ -49,12 +63,13 @@ END
     exit "$exit_code"
 }
 
-opts=$($GETOPT --options hnv46 --long help,dry-run,verbose --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$($GETOPT --options hnvd46 --long help,dry-run,debug,verbose --name "$SCRIPT_NAME" -- "$@") || usage
 eval set -- "$opts"
 
 while true; do
     case "$1" in
         -h | --help) usage 0 ;;
+        -d | --debug) opt_debug=opt_debug; shift ;;
         -v | --verbose) opt_verbose=opt_verbose; shift ;;
         -4) opt_ipv4=opt_ipv4; shift ;;
         -6) opt_ipv6=opt_ipv6; shift ;;
@@ -182,7 +197,9 @@ function query {
 # NOTE: When not run in verbose mode, the caller is looking for a single answer, so
 #   we try to prioritize fast methods and providers first.
 
-if command -v dig &>/dev/null; then
+# 2026-01-25 Disabled because google gives a different IP than Cloudflare (and we care about
+#   Cloudflare for srv-crowdsec-allow-ip.sh)
+if false && command -v dig &>/dev/null; then
     # 2025-09-17 Strange, at a cafe where they seem to have IPv6, Cloudflare won't return anything for
     #      dig -4 txt ch +short whoami.cloudflare @1.1.1.1
     #    but Google has no such problem
@@ -208,13 +225,13 @@ if command -v dig &>/dev/null; then
                     esac
                 fi
                 # shellcheck disable=SC2086
+                debug "dig $flags $cmd_flags"
                 query "$provider dig $ipv" \
                     "$(dig $flags $cmd_flags \
                     | sed -n 's/"\(.*\)"/\1/p')"
             fi
         done
     done
-
 fi
 
 if command -v "$NC" &>/dev/null; then
@@ -228,6 +245,7 @@ if command -v "$NC" &>/dev/null; then
             query_key="query_$ipv"
             flag_key="flag_$ipv"
             if [[ -n ${!query_key:-} ]]; then
+                debug "$NC ${!flag_key:-} ${NC_FLAGS[*]} $domain 23"
                 query "$provider $NC $ipv" \
                     "$("$NC" ${!flag_key:-} "${NC_FLAGS[@]}" "$domain" 23)"
             fi
@@ -267,6 +285,7 @@ for web_command in "$CURL"; do
                         fi
                     fi
                     # shellcheck disable=SC2086
+                    debug "$web_command ${!flag_key:-} ${flags[*]} $url"
                     query "$provider $web_command $ipv" \
                         "$("$web_command" ${!flag_key:-} "${flags[@]}" "$url" \
                         | sed 's/.*"ip":.*"\(.*\)".*/\1/')"
@@ -287,6 +306,7 @@ if command -v "$WGET" &>/dev/null; then
     fi
     query_key="query_$ipv"
     flag_key="flag_$ipv"
+    debug "$WGET ${!flag_key:-} ${WGET_FLAGS[*]} https://ident.me"
     query "ident $WGET $ipv" \
         "$("$WGET" ${!flag_key:-} "${WGET_FLAGS[@]}" https://ident.me </dev/null \
         || "$WGET" ${!flag_key:-} "${WGET_FLAGS[@]}" https://tnedi.me </dev/null)"
