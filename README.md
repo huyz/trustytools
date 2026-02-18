@@ -49,6 +49,7 @@ useful for everyday use.
 | `list-processes`                  | Lists running processes as seen from "System Events"                                                                                                       |
 | `list-tm-backups`                 | Lists all the Time Machine backups                                                                                                                         |
 | `mac-info`                        | Prints out one line of info about macOS software and hardware of the current machine (`macOS 14.4.1 23E224 (Sonoma) MacBookPro18,2 (Apple M1 Max, arm64)`) |
+| `mem-pressure`                    | Wraps system `memory_pressure` for human-readable, actionable output                                                                                       |
 | `mountpoint`                      | Like on linux, checks if a file/dir is a mountpoint                                                                                                        |
 | `port-inactive-safe-to-uninstall` | List inactive MacPorts package versions that have active replacements                                                                                      |
 | `port-pip-find-packages`          | For the MacPorts Python interpreters, lists all the pip packages and whether they were installed via MacPorts                                              |
