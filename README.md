@@ -39,6 +39,8 @@ useful for everyday use.
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `autoclear-clipboard`             | Automatically clears passwords from clipboard after a brief time (because Universal Clipboard is dangerous)                                                |
 | `bundle-id`                       | Displays the bundle ID of specific application (useful for `terminal-notifier`)                                                                            |
+| `chromium-doh-set`    | Sets DNS-over-HTTPS (DoH) for Chromium-based browsers                                                                                                       |
+| `chromium-mtls-autoselect`        | Eliminates pop-ups for selecting mTLS client certificates in Chromium-based browsers                                                                       |
 | `eject`                           | Ejects a removable disk by user-friendly volume name                                                                                                       |
 | `get-bounds-of-mouse-display`     | Displays the bounds of the display where the mouse is                                                                                                      |
 | `is-app-running`                  | Checks if the given application (using macOS friendly name) is running                                                                                     |
