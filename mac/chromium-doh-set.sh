@@ -1,5 +1,8 @@
 #!/bin/bash
-# shellcheck shell=bash
+# Sets DNS-over-HTTPS (DoH) for Chromium-based browsers (Chrome, Edge, Brave) via Managed
+# Preferences, which will override any user preferences and can't be easily bypassed by the user.
+# This is intended to be used in conjunction with a local DoH proxy like dnscrypt-proxy or
+# Cloudflare's cloudflared, but you can also use a public DoH resolver such as Control D or NextDNS
 
 #### Preamble (v2025-08-22)
 
@@ -52,20 +55,21 @@ for user in "${users[@]}"; do
 
     echo "𐄬 Checking Chromium Managed Preferences for user ${user}…"
     # Skip Arc Browser now that it's been abandoned
-    #"/Library/Managed Preferences/$user/company.thebrowser.Browser.plist" \
+    #    "company.thebrowser.Browser" \
+    #    "com.google.Chrome" \
     for i in \
-        "/Library/Managed Preferences/$user/com.brave.Browser.plist" \
-        "/Library/Managed Preferences/$user/com.google.Chrome.plist" \
-        "/Library/Managed Preferences/$user/com.microsoft.edgemac.plist" \
+        "com.brave.Browser" \
+        "com.microsoft.edgemac" \
     ; do
-        if [[ -e "$i" ]]; then
-            #echo "$i already exists. Skipping." >&2
+        file="/Library/Managed Preferences/$user/$i.plist"
+        if [[ -e "$file" ]]; then
+            #echo "$file already exists. Skipping." >&2
             continue
         fi
 
-        echo "  𐄭 Creating ${i} and setting DoH…"
+        echo "  𐄭 Creating ${file} and setting DoH…"
         sudo mkdir -p "/Library/Managed Preferences/$user"
-        cat <<EOF | sudo sh -c "cat > '$i'"
+        cat <<EOF | sudo sh -c "cat > '$file'"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -83,7 +87,6 @@ EOF
 done
 
 if [[ -n $restart_cfprefsd ]]; then
-    echo "𐄬 Restarting cfprefsd for changes to take effect…"
-    # This will restart cfprefsd for all users, including root
-    sudo pkill cfprefsd || true
+    echo "𐄬 Restarting cfprefsd daemon for changes to take effect…"
+    sudo pkill -f 'cfprefsd daemon'|| true
 fi
