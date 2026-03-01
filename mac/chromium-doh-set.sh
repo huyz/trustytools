@@ -56,9 +56,9 @@ for user in "${users[@]}"; do
     echo "𐄬 Checking Chromium Managed Preferences for user ${user}…"
     # Skip Arc Browser now that it's been abandoned
     #    "company.thebrowser.Browser" \
-    #    "com.google.Chrome" \
     for i in \
         "com.brave.Browser" \
+        "com.google.Chrome" \
         "com.microsoft.edgemac" \
     ; do
         file="/Library/Managed Preferences/$user/$i.plist"
