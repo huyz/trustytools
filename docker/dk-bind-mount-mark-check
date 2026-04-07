@@ -52,39 +52,37 @@ function check_container_running {
     fi
 }
 
-# Helper to run a command and capture stdout/stderr to variables, cleaning up temp files.
+# Temp files for capture_cmd_output; cleaned up on exit.
+TEMP_STDOUT=$(mktemp)
+TEMP_STDERR=$(mktemp)
+trap 'rm -f "$TEMP_STDOUT" "$TEMP_STDERR"' EXIT
+
+# Helper to run a command and capture stdout/stderr to temp files (binary-safe).
 # Usage: capture_cmd_output <cmd...>
-# Sets: CAPTURED_STDOUT, CAPTURED_STDERR
+# Results written to: $TEMP_STDOUT, $TEMP_STDERR
 function capture_cmd_output {
-    local temp_stdout temp_stderr
-    temp_stdout=$(mktemp)
-    temp_stderr=$(mktemp)
     local exit_code=0
-    #echo "#❯ $* > $temp_stdout 2> $temp_stderr" >&2
-    "$@" > "$temp_stdout" 2> "$temp_stderr" || exit_code="$?"
-    CAPTURED_STDOUT=$(cat "$temp_stdout")
-    CAPTURED_STDERR=$(cat "$temp_stderr")
-    rm "$temp_stdout" "$temp_stderr"
+    #echo "#❯ $* > $TEMP_STDOUT 2> $TEMP_STDERR" >&2
+    "$@" > "$TEMP_STDOUT" 2> "$TEMP_STDERR" || exit_code="$?"
     return "$exit_code"
 }
 
 function container_cat {
     local container="$1" file="$2"
-    shift
     local exit_code=0
     #echo capture_cmd_output docker exec "$container" /bin/cat "$file" >&2
     capture_cmd_output docker exec "$container" /bin/cat "$file" || exit_code="$?"
-    if [[ -n "$CAPTURED_STDOUT" && "$CAPTURED_STDOUT" == *'runtime exec failed'* ]]; then
+    if grep -q 'runtime exec failed' "$TEMP_STDOUT" 2>/dev/null; then
         echo "  🔙 Container $container has no basic utilities; falling back to 'alpine nsenter'…" >&2
         # This container doesn't even have `test` or `cat` tools
         # so try again with a helper container
         pid=$(docker inspect --format '{{.State.Pid}}' "$container")
         docker run --rm --privileged --pid=host alpine nsenter cat "/proc/$pid/root$file"
-    elif [[ -n "$CAPTURED_STDERR" ]]; then
+    elif [[ -s "$TEMP_STDERR" ]]; then
         echo "❗ ${container}: can't find sentinel:" >&2
-        echo "$CAPTURED_STDERR" >&2
+        cat "$TEMP_STDERR" >&2
     else
-        echo "$CAPTURED_STDOUT"
+        cat "$TEMP_STDOUT"
     fi
     return "$exit_code"
 }
