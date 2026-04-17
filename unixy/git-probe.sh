@@ -1,6 +1,7 @@
 #!/bin/bash
 # Give some quick stats on a new git repo
-# https://piechowski.io/post/git-commands-before-reading-code/
+# Source: https://piechowski.io/post/git-commands-before-reading-code/
+# More comprehensive tool: https://github.com/hjr265/gittop
 
 #### Preamble (v2025-08-22)
 
