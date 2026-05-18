@@ -153,9 +153,23 @@ LOG_FILE="${HOME}/.config/sunshine/sunshine.log"
 
 #### Main
 
+sunshine_args=("$@")
+
+# shellcheck disable=SC2329
+function start_sunshine() {
+    "$(next_in_path "$0")" "${sunshine_args[@]}" &
+    sunshine_pid=$!
+}
+
+# shellcheck disable=SC2329
+function restart_sunshine() {
+    kill "$sunshine_pid" 2>/dev/null || true
+    wait "$sunshine_pid" 2>/dev/null || true
+    start_sunshine
+}
+
 # Start Sunshine normally in background
-"$(next_in_path "$0")" "$@" &
-sunshine_pid=$!
+start_sunshine
 
 # shellcheck disable=SC2329
 function cleanup() {
@@ -221,6 +235,8 @@ if [[ -n "$opt_display" ]]; then
 
     info "Detected ${opt_display} display id: ${display_id}"
 
+    config_snapshot="$(cat "$CONFIG_FILE" 2>/dev/null || true)"
+
     # Update Sunshine config in-place
     if grep -q '^output_name *=.*' "$CONFIG_FILE"; then
         sed -i.bak -E \
@@ -231,6 +247,11 @@ if [[ -n "$opt_display" ]]; then
     fi
 
     info "Updated output_name to ${display_id}"
+
+    if [[ "$(cat "$CONFIG_FILE" 2>/dev/null || true)" != "$config_snapshot" ]]; then
+        info "Config changed; restarting Sunshine"
+        restart_sunshine
+    fi
 fi
 
 # Keep wrapper attached to Sunshine process
