@@ -439,7 +439,7 @@ echo "Installed packages with newer backport available : $newer_backport_count"
 echo "Installed packages already from backports        : $already_on_backports_count"
 echo "Installed packages without newer backport        : $installed_no_newer_count"
 if [[ $include_not_installed -eq 1 ]]; then
-	echo "Backports packages that are not installed         : $not_installed_count"
+	echo "Backports packages that are not installed        : $not_installed_count"
 fi
 echo "Relevant virtual package names                   : $virtual_count"
 
@@ -481,11 +481,6 @@ if (( actionable_count > 0 )); then
         fi
     fi
 
-    if [[ -z "$detected_suite" ]]; then
-        echo "Could not auto-detect backports suite name." >&2
-        echo "Use: sudo apt -s install -t <codename>-backports ..." >&2
-    fi
-
 	echo
 	echo "Actionable conclusion"
 	echo "-----------------------------------------------------------------"
@@ -494,10 +489,11 @@ if (( actionable_count > 0 )); then
 	echo
     if [[ -n "$detected_suite" ]]; then
         echo "Review and upgrade explicitly (recommended dry run first):"
-        echo "  sudo apt install --dry-run -t $detected_suite ${ACTIONABLE_PACKAGES[*]}"
+        echo "  sudo apt --dry-run install -t $detected_suite ${ACTIONABLE_PACKAGES[*]}"
         echo "If the simulation looks correct, run without --dry-run:"
         echo "  sudo apt install -t $detected_suite ${ACTIONABLE_PACKAGES[*]}"
     else
+        echo "WARNING: Could not auto-detect backports suite name." >&2
         echo "Review and upgrade explicitly (recommended dry run first):"
         echo "  sudo apt --dry-run install -t <codename>-backports ${ACTIONABLE_PACKAGES[*]}"
         echo "If the simulation looks correct, run without --dry-run:"
