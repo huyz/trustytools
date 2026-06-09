@@ -9,6 +9,7 @@ useful for everyday use.
 
 | Command                          | Description                                                                                                                                                                                                           |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apt-backports`                  | On Debian-based Linux, check for newer versions of installed packages in the backports repositories.                                                                                                                |
 | `brew-deptree`                   | Displays dependency tree for all installed packages                                                                                                                                                                   |
 | `brew-installed-sizes`           | List installed Homebrew formulae and their sizes                                                                                                                                                                      |
 | `brew-requested`                 | List all `requested` Homebrew formulae                                                                                                                                                                                |
