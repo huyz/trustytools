@@ -5,7 +5,7 @@
 # Usage:
 #   apt-backports [--include-not-installed] [--debug]
 #
-# 2026-06-09 Written by GPT 5.3-codex & Claude Sonnet 4.6
+# 2026-06-09 Authored by GPT 5.3-codex & Claude Sonnet 4.6
 
 
 # Check for bash 4 for `readarray`, associatve arrays, etc.
