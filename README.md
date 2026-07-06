@@ -24,6 +24,7 @@ useful for everyday use.
 | `gh-remote-add-fork`             | Lets you interactively select forks (or the upstream's forks) to add as remotes to your local checkout                                                                                                                |
 | `git-probe`                      | Quick probe of git repo's history, contributors, and changes                                                                                                                                                          |
 | `git-list-big-objects`           | Lists the biggest objects in a git repository                                                                                                                                                                         |
+| `ip2geo`                         | Given a hostname or IP address, spits out city, state, country |
 | `jetbrains-macros-text-keycodes` | Help for JetBrains IDE macros.xml editing: converts a string to type into the proper XML                                                                                                                              |
 | `ldwhich`                        | Finds location of a dynamic library by traversing the search path, for Linux, OS X, and other Unix systems.                                                                                                           |
 | `list`                           | Simply shows/lists files with the right pager(s) depending on filename extension(s)                                                                                                                                   |
@@ -80,7 +81,6 @@ Other folks' scripts found here and there.
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `fzf-passage`                | Quick picker for [passage](https://github.com/FiloSottile/passage)                                                                                           |
 | `git-quote-string-multiline` | Helper for creating complex git aliases, in particular quoting special characters                                                                            |
-| `ip2geo`                     | Given a hostname or IP address, spits out city, state, country {From [commandlinefu.com](http://commandlinefu.com)}                                          |
 | `mac-disable-automount`      | Disables the automounting of specified volumes on macOS                                                                                                      |
 | `mac-get-focus-mode`         | On macOS, Outputs the current "Focus" mode                                                                                                                   |
 | `netls`                      | Graphs the number of connections for each connected remote host {From [commandlinefu.com](http://commandlinefu.com)}                                         |
