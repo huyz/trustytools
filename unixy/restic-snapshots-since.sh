@@ -54,7 +54,10 @@ if [[ $# -ne 1 || "$1" == -h || "$1" == --help ]]; then
     usage
 fi
 
-cutoff=$($DATE -d "$1" +%s)
+if ! cutoff=$($DATE -d "$1" +%s); then
+    echo "$SCRIPT_NAME: ERROR: Invalid GNU date expression: $1" >&2
+    exit 1
+fi
 
 restic snapshots --json | jq -r --argjson cutoff "$cutoff" '
     .[] |
@@ -67,5 +70,5 @@ restic snapshots --json | jq -r --argjson cutoff "$cutoff" '
         | mktime
         ) >= $cutoff
     ) |
-    .id
+    .short_id
 '
