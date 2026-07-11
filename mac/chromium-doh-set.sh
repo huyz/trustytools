@@ -3,6 +3,9 @@
 # Preferences, which will override any user preferences and can't be easily bypassed by the user.
 # This is intended to be used in conjunction with a local DoH proxy like dnscrypt-proxy or
 # Cloudflare's cloudflared, but you can also use a public DoH resolver such as Control D or NextDNS
+# Usage:
+#   chromium-doh-set-to-controld [--global] <DoH_url> [user…]
+#        --global: Write system-level managed preferences (conflicts with user arguments)
 
 #### Preamble (v2025-08-22)
 
@@ -28,10 +31,81 @@ SCRIPT_DIR=$(dirname "$script")
 
 USER="${USER:-"$(whoami)"}"
 
+function usage {
+    echo "Usage: $SCRIPT_NAME [--global] <DoH_url> [user…]" >&2
+    echo "  Default user: $USER" >&2
+    echo "  --global: Write system-level managed preferences (conflicts with user arguments)" >&2
+}
+
+function ensure_plist_exists {
+    local file=$1
+
+    if [[ -e "$file" ]]; then
+        return
+    fi
+
+    sudo mkdir -p "$(dirname "$file")"
+    cat <<'EOF' | sudo sh -c "cat > '$file'"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict/>
+</plist>
+EOF
+}
+
+function ensure_plist_string {
+    local file=$1
+    local key=$2
+    local desired=$3
+    local current
+
+    if current=$(sudo /usr/libexec/PlistBuddy -c "Print :$key" "$file" 2>/dev/null); then
+        if [[ "$current" == "$desired" ]]; then
+            return
+        fi
+        sudo /usr/libexec/PlistBuddy -c "Set :$key $desired" "$file"
+    else
+        sudo /usr/libexec/PlistBuddy -c "Add :$key string $desired" "$file"
+    fi
+
+    restart_cfprefsd=1
+}
+
 
 if [[ $# -lt 1 || "$1" == -h || "$1" == --help ]]; then
-    echo "Usage: $SCRIPT_NAME <DoH_url> [user…]" >&2
-    echo "  Default user: $USER" >&2
+    usage
+    exit 1
+fi
+
+is_global=
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --global)
+            is_global=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            usage
+            exit 1
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [[ $# -lt 1 ]]; then
+    usage
     exit 1
 fi
 
@@ -40,9 +114,15 @@ shift
 
 users=("$@")
 
+if [[ -n "$is_global" && ${#users[@]} -gt 0 ]]; then
+    echo "Error: --global conflicts with user arguments." >&2
+    usage
+    exit 1
+fi
+
 ### Init
 
-if [[ ${#users[@]} -eq 0 ]]; then
+if [[ -z "$is_global" && ${#users[@]} -eq 0 ]]; then
     users=("$USER")
 fi
 
@@ -50,10 +130,8 @@ fi
 
 restart_cfprefsd=
 
-for user in "${users[@]}"; do
-    [[ -d "/Users/$user" ]] || continue
-
-    echo "𐄬 Checking Chromium Managed Preferences for user ${user}…"
+if [[ -n "$is_global" ]]; then
+    echo "𐄬 Checking Chromium Managed Preferences at system level…"
     # Skip Arc Browser now that it's been abandoned
     #    "company.thebrowser.Browser" \
     for i in \
@@ -61,30 +139,32 @@ for user in "${users[@]}"; do
         "com.google.Chrome" \
         "com.microsoft.edgemac" \
     ; do
-        file="/Library/Managed Preferences/$user/$i.plist"
-        if [[ -e "$file" ]]; then
-            #echo "$file already exists. Skipping." >&2
-            continue
-        fi
-
-        echo "  𐄭 Creating ${file} and setting DoH…"
-        sudo mkdir -p "/Library/Managed Preferences/$user"
-        cat <<EOF | sudo sh -c "cat > '$file'"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>DnsOverHttpsMode</key>
-    <string>secure</string>
-    <key>DnsOverHttpsTemplates</key>
-    <string>$doh_url</string>
-</dict>
-</plist>
-EOF
-
-        restart_cfprefsd=1
+        file="/Library/Managed Preferences/$i.plist"
+        echo "  𐄭 Ensuring ${file} has DoH settings…"
+        ensure_plist_exists "$file"
+        ensure_plist_string "$file" "DnsOverHttpsMode" "secure"
+        ensure_plist_string "$file" "DnsOverHttpsTemplates" "$doh_url"
     done
-done
+else
+    for user in "${users[@]}"; do
+        [[ -d "/Users/$user" ]] || continue
+
+        echo "𐄬 Checking Chromium Managed Preferences for user ${user}…"
+        # Skip Arc Browser now that it's been abandoned
+        #    "company.thebrowser.Browser" \
+        for i in \
+            "com.brave.Browser" \
+            "com.google.Chrome" \
+            "com.microsoft.edgemac" \
+        ; do
+            file="/Library/Managed Preferences/$user/$i.plist"
+            echo "  𐄭 Ensuring ${file} has DoH settings…"
+            ensure_plist_exists "$file"
+            ensure_plist_string "$file" "DnsOverHttpsMode" "secure"
+            ensure_plist_string "$file" "DnsOverHttpsTemplates" "$doh_url"
+        done
+    done
+fi
 
 if [[ -n $restart_cfprefsd ]]; then
     echo "𐄬 Restarting cfprefsd daemon for changes to take effect…"
