@@ -1,25 +1,31 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Returns your IPv4 or IPv6 address by querying different providers.
 # Usage: my-ip [-h|--help] [-v|--verbose] [-4] [-6]
+
+# Check for bash 4.4+ for namerefs, `readarray -d`, associative arrays, etc.
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+    echo "${BASH_SOURCE[0]}: ERROR: bash v4.4+ required." >&2
+    exit 1
+fi
 
 #set -x
 
 #### Preamble (v2025-08-22)
 
 set -uo pipefail
-shopt -s failglob
+shopt -s failglob extglob
 # shellcheck disable=SC2329
 function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
 #jjtrap trap_err ERR
 trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
-GETOPT=getopt
-NC=nc
-CURL=curl
-WGET=wget
-OPENSSL=openssl
-SSH=ssh
+readonly GETOPT=getopt
+readonly NC=nc
+readonly CURL=curl
+readonly WGET=wget
+readonly OPENSSL=openssl
+readonly SSH=ssh
 
 # shellcheck disable=SC2034
 SCRIPT_NAME=$(basename "${BASH_SOURCE[0]}")
@@ -50,20 +56,24 @@ opt_verbose=
 opt_debug=
 opt_ipv4=
 opt_ipv6=
+opt_providers=()
+opt_exclude=()
 
 function usage {
-    local exit_code="${1:-1}"
+    local -r exit_code="${1:-1}"
     cat <<END >&2
 Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-4] [-6]
         -h|--help: get help
-        -v|--verbose: turn on verbose mode
+        -v|--verbose: turn on verbose mode (show all answers instead of first)
         -4: use IPv4 only
         -6: use IPv6 only
+    --providers LIST: comma-separated provider symbols; may be repeated
+    --exclude LIST: comma-separated provider symbols to exclude; may be repeated
 END
     exit "$exit_code"
 }
 
-opts=$($GETOPT --options hnvd46 --long help,dry-run,debug,verbose --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$($GETOPT --options hnvd46 --long help,dry-run,debug,verbose,providers:,exclude: --name "$SCRIPT_NAME" -- "$@") || usage
 eval set -- "$opts"
 
 while true; do
@@ -73,6 +83,8 @@ while true; do
         -v | --verbose) opt_verbose=opt_verbose; shift ;;
         -4) opt_ipv4=opt_ipv4; shift ;;
         -6) opt_ipv6=opt_ipv6; shift ;;
+        --providers) opt_providers+=("$2"); shift 2 ;;
+        --exclude) opt_exclude+=("$2"); shift 2 ;;
         #-a | --argument) opt_argument="$2"; shift 2 ;;
         --) shift; break ;;
         *) abort "🐛 INTERNAL: unrecognized option '$1'" ;;
@@ -84,6 +96,102 @@ done
 ##############################################################################
 #### Config
 
+# Default providers.
+# 2026-07-14 Exclude ident because it's been broken for months
+# 2026-01-25 Exclude google because it gives a different IP than Cloudflare (and we care about
+#   Cloudflare for srv-crowdsec-allow-ip.sh)
+#readonly -a ALLOWED_PROVIDERS=(ident ifconfig ipify ipinfo google cloudflare opendns)
+readonly -a ALLOWED_PROVIDERS=(ifconfig ipify ipinfo cloudflare opendns)
+
+providers=("${ALLOWED_PROVIDERS[@]}")
+declare -A ALLOWED_PROVIDER_SET=()
+declare -A ENABLED_PROVIDER_SET=()
+declare -A resolved_provider_set=()
+declare -A excluded_provider_set=()
+declare -Ar WEB_PROVIDER_URL=(
+    [ident]=https://ident.me
+    [ifconfig]=https://ifconfig.me
+    [ipify]=https://api64.ipify.org
+    [ipinfo]=https://ipinfo.io/ip
+)
+
+for provider in "${ALLOWED_PROVIDERS[@]}"; do
+    ALLOWED_PROVIDER_SET["$provider"]=1
+done
+
+function rebuild_enabled_provider_set {
+    ENABLED_PROVIDER_SET=()
+    local provider=
+    for provider in "${providers[@]}"; do
+        ENABLED_PROVIDER_SET["$provider"]=1
+    done
+}
+
+function provider_is_allowed {
+    [[ -v ALLOWED_PROVIDER_SET[$1] ]]
+}
+
+function provider_is_enabled {
+    [[ -v ENABLED_PROVIDER_SET[$1] ]]
+}
+
+function add_providers_from_csv {
+    local -n _target_array="$1"
+    local -n _target_set="$2"
+    local -r csv="$3"
+    local -a entries=()
+    local entry=""
+    local trimmed=""
+
+    readarray -td ',' entries < <(printf '%s,' "$csv")
+    for entry in "${entries[@]}"; do
+        trimmed="${entry,,}"
+        trimmed="${trimmed##+([[:space:]])}"
+        trimmed="${trimmed%%+([[:space:]])}"
+        [[ -n $trimmed ]] || continue
+
+        provider_is_allowed "$trimmed" \
+            || abort "Invalid provider '$trimmed'. Allowed: ${ALLOWED_PROVIDERS[*]}"
+
+        if [[ ! -v _target_set[$trimmed] ]]; then
+            _target_set["$trimmed"]=1
+            _target_array+=("$trimmed")
+        fi
+    done
+}
+
+resolved_providers=()
+excluded_providers=()
+
+if [[ ${#opt_providers[@]} -gt 0 ]]; then
+    for csv in "${opt_providers[@]}"; do
+        add_providers_from_csv resolved_providers resolved_provider_set "$csv"
+    done
+else
+    resolved_providers=("${providers[@]}")
+fi
+
+for csv in "${opt_exclude[@]}"; do
+    add_providers_from_csv excluded_providers excluded_provider_set "$csv"
+done
+
+debug "Resolved providers: ${resolved_providers[*]}"
+debug "Resolved provider set size: ${#resolved_provider_set[@]}"
+debug "Excluded providers: ${excluded_providers[*]-}"
+
+providers=()
+for provider in "${resolved_providers[@]}"; do
+    skip=
+    [[ -v excluded_provider_set[$provider] ]] && skip=1
+    [[ -n $skip ]] || providers+=("$provider")
+done
+
+[[ ${#providers[@]} -gt 0 ]] || abort "No providers left after applying --providers/--exclude"
+
+rebuild_enabled_provider_set
+
+debug "Providers: ${providers[*]}"
+
 # shellcheck disable=SC2034
 flag_any=
 # shellcheck disable=SC2034
@@ -91,15 +199,16 @@ flag_ipv4=-4
 # shellcheck disable=SC2034
 flag_ipv6=-6
 
-CURL_FLAGS=(--silent --fail --max-time 2)
-WGET_FLAGS=(--quiet --output-document=- --timeout=2 --tries=1)
-OPENSSL_FLAGS=(-quiet -connect)
-SSH_FLAGS=(-q -o StrictHostKeyChecking=accept-new -o ConnectTimeout=2 -o BatchMode=yes)
+readonly -a CURL_FLAGS=(--silent --fail --max-time 2)
+readonly -a WGET_FLAGS=(--quiet --output-document=- --timeout=2 --tries=1)
+readonly -a OPENSSL_FLAGS=(-quiet -connect)
+readonly -a SSH_FLAGS=(-q -o StrictHostKeyChecking=accept-new -o ConnectTimeout=2 -o BatchMode=yes)
 
 case "$OSTYPE" in
     darwin*) NC_FLAGS=(-G 2) ;;
     *) NC_FLAGS=(-w 2) ;;
 esac
+readonly -a NC_FLAGS
 
 #### Init
 
@@ -197,9 +306,9 @@ function query {
 # NOTE: When not run in verbose mode, the caller is looking for a single answer, so
 #   we try to prioritize fast methods and providers first.
 
-# 2026-01-25 Disabled because google gives a different IP than Cloudflare (and we care about
-#   Cloudflare for srv-crowdsec-allow-ip.sh)
-if false && command -v dig &>/dev/null; then
+if command -v dig &>/dev/null; then
+    # 2026-07-14 Doesn't w ork:
+    #
     # 2025-09-17 Strange, at a cafe where they seem to have IPv6, Cloudflare won't return anything for
     #      dig -4 txt ch +short whoami.cloudflare @1.1.1.1
     #    but Google has no such problem
@@ -208,8 +317,10 @@ if false && command -v dig &>/dev/null; then
     for cmd_flags in \
         "txt +short o-o.myaddr.google.com @ns1.google.com" \
         "txt ch +short whoami.cloudflare @1dot1dot1dot1.cloudflare-dns.com" \
+        "+short myip.opendns.com @resolver1.opendns.com" \
     ; do
         provider=$(echo "$cmd_flags" | perl -lpe 's/.*? (?:[-\w]+\.)+?((?!com)\w+)(\.com)? .*/$1/')
+        provider_is_enabled "$provider" || continue
         for ipv in any ipv4 ipv6; do
             query_key="query_$ipv"
             flag_key="flag_$ipv"
@@ -228,28 +339,23 @@ if false && command -v dig &>/dev/null; then
                 debug "dig $flags $cmd_flags"
                 query "$provider dig $ipv" \
                     "$(dig $flags $cmd_flags \
-                    | sed -n 's/"\(.*\)"/\1/p')"
+                    | sed -nE 's/^"?([^"]+?)"?$/\1/p')"
             fi
         done
     done
 fi
 
-if command -v "$NC" &>/dev/null; then
+if command -v "$NC" &>/dev/null && provider_is_enabled ident; then
     # 2025-09-17 Hmm based on my query to ident.me, nc does fall back to IPv4 more often than other
     #   apps
-    for domain in \
-        ident.me \
-    ; do
-        provider=$(echo -n "$domain" | perl -lpe 's/.*?(?:^|[-\w]+\.|.*:\/\/)+?((?!com|org|me|io)\w+)(?:\.com|\.org|\.me|\.io)?$/$1/')
-        for ipv in any ipv4 ipv6; do
-            query_key="query_$ipv"
-            flag_key="flag_$ipv"
-            if [[ -n ${!query_key:-} ]]; then
-                debug "$NC ${!flag_key:-} ${NC_FLAGS[*]} $domain 23"
-                query "$provider $NC $ipv" \
-                    "$("$NC" ${!flag_key:-} "${NC_FLAGS[@]}" "$domain" 23)"
-            fi
-        done
+    for ipv in any ipv4 ipv6; do
+        query_key="query_$ipv"
+        flag_key="flag_$ipv"
+        if [[ -n ${!query_key:-} ]]; then
+            debug "$NC ${!flag_key:-} ${NC_FLAGS[*]} ident.me 23"
+            query "ident $NC $ipv" \
+                "$("$NC" ${!flag_key:-} "${NC_FLAGS[@]}" ident.me 23)"
+        fi
     done
 fi
 
@@ -260,20 +366,14 @@ for web_command in "$CURL"; do
             *curl) flags=("${CURL_FLAGS[@]}") ;;
             *wget) flags=("${WGET_FLAGS[@]}") ;;
         esac
-        # 2025-09-17 ipinfo: temporarily used http instead of https, as their LetsEncrypt SSL cert
-        #   expired for several hours
-        for url in \
-            https://ifconfig.me \
-            https://api64.ipify.org \
-            https://ipinfo.io/ip \
-            https://ident.me \
-        ; do
-            provider=$(echo -n "$url" | perl -lpe 's/.*?(?:^|[-\w]+\.|.*:\/\/)+?((?!com|org|me|io)\w+)(?:\.com|\.org|\.me|\.io)?(?:\/.*)?$/$1/')
+        for provider in "${providers[@]}"; do
+            [[ -v WEB_PROVIDER_URL[$provider] ]] || continue
+            url="${WEB_PROVIDER_URL[$provider]}"
             for ipv in any ipv4 ipv6; do
                 query_key="query_$ipv"
                 flag_key="flag_$ipv"
                 if [[ -n ${!query_key:-} ]]; then
-                    if [[ $url == *ipinfo* ]]; then
+                    if [[ $provider == ipinfo ]]; then
                         if [[ $ipv == ipv6 ]]; then
                             url=https://v6.ipinfo.io/ip
                         elif [[ $ipv == any ]]; then
@@ -296,7 +396,7 @@ for web_command in "$CURL"; do
 done
 
 # In verbose mode, we don't do all types of IPv because that would be redundant with curl
-if command -v "$WGET" &>/dev/null; then
+if command -v "$WGET" &>/dev/null && provider_is_enabled ident; then
     if [[ -n $opt_ipv4 ]]; then
         ipv=ipv4
     elif [[ -n $opt_ipv6 && -n ${has_ipv6:-} ]]; then
@@ -312,36 +412,26 @@ if command -v "$WGET" &>/dev/null; then
         || "$WGET" ${!flag_key:-} "${WGET_FLAGS[@]}" https://tnedi.me </dev/null)"
 fi
 
-if command -v "$OPENSSL" &>/dev/null; then
+if command -v "$OPENSSL" &>/dev/null && provider_is_enabled ident; then
     ## 2025-09-17 Doesn't work; I get "Connection refused"
-    for host in \
-        ident.me:992 \
-    ; do
-        provider=$(echo -n "$host" | perl -lpe 's/.*?(?:^|[-\w]+\.|.*:\/\/)+?((?!com|org|me|io)\w+)(?:\.com|\.org|\.me|\.io)?(?::\d+)?$/$1/')
-        for ipv in any ipv4 ipv6; do
-            query_key="query_$ipv"
-            flag_key="flag_$ipv"
-            if [[ -n ${!query_key:-} ]]; then
-                query "$provider $OPENSSL $ipv" \
-                    "$("$OPENSSL" s_client ${!flag_key:-} "${OPENSSL_FLAGS[@]}" "${host}" 2>/dev/null)"
-            fi
-        done
+    for ipv in any ipv4 ipv6; do
+        query_key="query_$ipv"
+        flag_key="flag_$ipv"
+        if [[ -n ${!query_key:-} ]]; then
+            query "ident $OPENSSL $ipv" \
+                "$("$OPENSSL" s_client ${!flag_key:-} "${OPENSSL_FLAGS[@]}" ident.me:992 2>/dev/null)"
+        fi
     done
 fi
 
-if command -v "$SSH" &>/dev/null; then
-    for domain in \
-        ident.me \
-    ; do
-        provider=$(echo -n "$domain" | perl -lpe 's/.*?(?:^|[-\w]+\.|.*:\/\/)+?((?!com|org|me|io)\w+)(?:\.com|\.org|\.me|\.io)?$/$1/')
-        for ipv in any ipv4 ipv6; do
-            query_key="query_$ipv"
-            flag_key="flag_$ipv"
-            if [[ -n ${!query_key:-} ]]; then
-                query "$provider $SSH $ipv" \
-                    "$("$SSH" ${!flag_key:-} "${SSH_FLAGS[@]}" "$domain")"
-            fi
-        done
+if command -v "$SSH" &>/dev/null && provider_is_enabled ident; then
+    for ipv in any ipv4 ipv6; do
+        query_key="query_$ipv"
+        flag_key="flag_$ipv"
+        if [[ -n ${!query_key:-} ]]; then
+            query "ident $SSH $ipv" \
+                "$("$SSH" ${!flag_key:-} "${SSH_FLAGS[@]}" ident.me)"
+        fi
     done
 fi
 
