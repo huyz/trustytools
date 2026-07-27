@@ -1,5 +1,6 @@
 #!/bin/bash
 # Get geographical information for IP addresses (or hostnames)
+# Alternative: brew install ip2location
 
 if [[ "$1" == -h ]]; then
     echo "Usage: $0 [ip_address|hostname]"
