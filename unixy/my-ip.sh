@@ -339,7 +339,7 @@ if command -v dig &>/dev/null; then
                 debug "dig $flags $cmd_flags"
                 query "$provider dig $ipv" \
                     "$(dig $flags $cmd_flags \
-                    | sed -nE 's/^"?([^"]+?)"?$/\1/p')"
+                    | sed -nE 's/^"?([^"]+)"?$/\1/p')"
             fi
         done
     done
