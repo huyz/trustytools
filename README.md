@@ -43,6 +43,7 @@ useful for everyday use.
 
 | Command                           | Description                                                                                                                                                |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `atext-to-vscode-snippets`         | Converts aText snippets to VS Code snippets format                                                                                                 |
 | `autoclear-clipboard`             | Automatically clears passwords from clipboard after a brief time (because Universal Clipboard is dangerous)                                                |
 | `bundle-id`                       | Displays the bundle ID of specific application (useful for `terminal-notifier`)                                                                            |
 | `chromium-doh-set`                | Sets DNS-over-HTTPS (DoH) for Chromium-based browsers                                                                                                      |
