@@ -34,9 +34,8 @@ import plistlib
 import re
 import sys
 from collections import Counter
-from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 
 ATEXT_MACRO_RE = re.compile(r"【([^】]*)】")
@@ -44,6 +43,8 @@ FIELD_RE = re.compile(r"^field:(.+)$")
 KEY_COUNT_RE = re.compile(r"\bcount:(\d+)\b")
 KEY_CODE_RE = re.compile(r"\bcode:(\d+)\b")
 
+# For VS Code reference:
+#   https://code.visualstudio.com/docs/editing/userdefinedsnippets
 DATE_FORMATS = {
     "short": "${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}",
     "medium": "${CURRENT_MONTH_NAME_SHORT} ${CURRENT_DATE}, ${CURRENT_YEAR}",
@@ -85,29 +86,49 @@ DATE_FORMATS = {
 TIME_FORMATS = {
     "short": "${CURRENT_HOUR}:${CURRENT_MINUTE}",
     "medium": "${CURRENT_HOUR}:${CURRENT_MINUTE}:${CURRENT_SECOND}",
+    "long": "${CURRENT_HOUR}:${CURRENT_MINUTE}:${CURRENT_SECOND}${CURRENT_TIMEZONE_OFFSET}",
+    "full": "${CURRENT_HOUR}:${CURRENT_MINUTE}:${CURRENT_SECOND} ${CURRENT_TIMEZONE_NAME}",
     "HH:mm": "${CURRENT_HOUR}:${CURRENT_MINUTE}",
     "HH:mm:ss": "${CURRENT_HOUR}:${CURRENT_MINUTE}:${CURRENT_SECOND}",
+    "unix": "${CURRENT_SECONDS_UNIX}",
+}
+
+
+DATE_TIME_FORMATS = {
+    "date": DATE_FORMATS,
+    "time": TIME_FORMATS,
 }
 
 
 class ConversionWarnings:
     def __init__(self) -> None:
-        self.unsupported: Counter[str] = Counter()
+        self.unsupported_macros: Counter[str] = Counter()
+        self.unsupported_date_time_formats: Counter[str] = Counter()
 
-    def add(self, macro: str) -> None:
-        self.unsupported[macro] += 1
+    def add_macro(self, macro: str) -> None:
+        self.unsupported_macros[macro] += 1
+
+    def add_date_time_format(self, kind: str, value: str) -> None:
+        self.unsupported_date_time_formats[f"{kind}:{value}"] += 1
 
     def print(self) -> None:
-        if not self.unsupported:
-            return
+        if self.unsupported_date_time_formats:
+            print(
+                "\nWarning: unsupported aText date/time formats were preserved verbatim:",
+                file=sys.stderr,
+            )
+            for format_name, count in self.unsupported_date_time_formats.items():
+                suffix = f" ({count} occurrences)" if count > 1 else ""
+                print(f"  {format_name}{suffix}", file=sys.stderr)
 
-        print(
-            "\nWarning: unsupported aText macros were preserved verbatim:",
-            file=sys.stderr,
-        )
-        for macro, count in self.unsupported.items():
-            suffix = f" ({count} occurrences)" if count > 1 else ""
-            print(f"  【{macro}】{suffix}", file=sys.stderr)
+        if self.unsupported_macros:
+            print(
+                "\nWarning: unsupported aText macros were preserved verbatim:",
+                file=sys.stderr,
+            )
+            for macro, count in self.unsupported_macros.items():
+                suffix = f" ({count} occurrences)" if count > 1 else ""
+                print(f"  【{macro}】{suffix}", file=sys.stderr)
 
 
 def parse_args() -> argparse.Namespace:
@@ -223,13 +244,13 @@ def escape_snippet_text(text: str) -> str:
     return text.replace("\\", "\\\\").replace("$", "\\$")
 
 
-def parse_date_or_time_macro(macro: str) -> str | None:
+def parse_date_or_time_macro(macro: str) -> tuple[str, str] | None:
     if macro.startswith("date:"):
+        kind = "date"
         raw_value = macro.removeprefix("date:").strip()
-        formats = DATE_FORMATS
     elif macro.startswith("time:"):
+        kind = "time"
         raw_value = macro.removeprefix("time:").strip()
-        formats = TIME_FORMATS
     else:
         return None
 
@@ -244,34 +265,7 @@ def parse_date_or_time_macro(macro: str) -> str | None:
 
         value = " ".join(value_parts)
 
-    if macro.startswith("time:"):
-        return formats.get(value) or render_time_format(value)
-
-    return formats.get(value)
-
-
-def render_time_format(value: str) -> str | None:
-    now = datetime.now().astimezone()
-
-    if value == "long":
-        return now.strftime("%H:%M:%S %Z")
-
-    if value == "full":
-        return now.strftime("%H:%M:%S %Z")
-
-    if value == "h:mm a":
-        return now.strftime("%I:%M %p").lstrip("0")
-
-    if value == "h:mm a, zzz":
-        return now.strftime("%I:%M %p, %Z").lstrip("0")
-
-    if value == "hh 'o''clock' a, zzzz":
-        return now.strftime("%I o'clock %p, %Z")
-
-    if value == "unix":
-        return str(int(now.timestamp()))
-
-    return None
+    return kind, value
 
 
 def key_macro_replacement(macro: str) -> tuple[str, int] | None:
@@ -352,8 +346,15 @@ def convert_phrase(
             )
             parts.append(f"${{{number}:{escaped_default}}}")
 
-        elif date_or_time_replacement := parse_date_or_time_macro(macro):
-            parts.append(date_or_time_replacement)
+        elif date_or_time_match := parse_date_or_time_macro(macro):
+            kind, value = date_or_time_match
+            replacement = DATE_TIME_FORMATS[kind].get(value)
+            if replacement is not None:
+                parts.append(replacement)
+            else:
+                warnings.add_date_time_format(kind, value)
+                if not drop_unsupported:
+                    parts.append(escape_snippet_text(match.group(0)))
 
         elif key_replacement := key_macro_replacement(macro):
             inserted_text, backspace_count = key_replacement
@@ -363,7 +364,7 @@ def convert_phrase(
                 parts.append(inserted_text)
 
         else:
-            warnings.add(macro)
+            warnings.add_macro(macro)
             if not drop_unsupported:
                 parts.append(escape_snippet_text(match.group(0)))
 
