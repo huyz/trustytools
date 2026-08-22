@@ -13,17 +13,22 @@
 #   1. Take a container name or ID.
 #   2. Find which local Docker image that container is using.
 #   3. Find that image's RepoDigest.
-#   4. Check Docker Hub / GHCR and print the tag(s) pointing at that digest.
+#   4. Find and print the current registry tag(s) for that digest.
 #
 # Prerequisites:
+# - curl
 # - jq
 # - docker CLI
+# - authenticated gh CLI with read:packages scope, optional fast path for GHCR
+# - skopeo, only for registries other than Docker Hub and GHCR
 #
 # TIP:
-# To list all the Repo digests for your containers:
+# - To list all the Repo digests for your containers:
 #    docker image ls --digests --format 'table {{.Repository}}\t{{.Tag}}\t{{.Digest}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}'
+# - To query all local containers:
+#   docker-image-tags $(docker ps -a --format "{{.Names}}")
 #
-# 2026-08-22 Authored mostly by DeepSeek V4 Flash
+# 2026-08-22 Authored mostly by DeepSeek V4 Flash and OpenAI's GPT 5.6 Sol
 
 #### Preamble (v2026-08-14)
 
@@ -46,8 +51,6 @@ if [[ $OSTYPE == darwin* ]]; then
         { echo "$0: ERROR: \`$_install_cmd jq\` to install $JQ." >&2; exit 1; }
     [[ -x "${DOCKER:="$HOMEBREW_PREFIX/bin/docker"}" ]] || \
         { echo "$0: ERROR: \`$_install_cmd docker\` to install $DOCKER." >&2; exit 1; }
-    [[ -x "${SORT:="$HOMEBREW_PREFIX/bin/gsort"}" ]] || \
-        { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $SORT." >&2; exit 1; }
 else
     _install_cmd="sudo apt install"
     GETOPT="getopt"
@@ -56,11 +59,11 @@ else
         { echo "$0: ERROR: \`$_install_cmd jq\` to install $JQ." >&2; exit 1; }
     command -v "${DOCKER:=docker}" &>/dev/null || \
         { echo "$0: ERROR: \`$_install_cmd docker\` to install $DOCKER." >&2; exit 1; }
-    command -v "${SORT:=sort}" &>/dev/null || \
-        { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $SORT." >&2; exit 1; }
 #    _install_cmd="brew install"
 #    HOMEBREW_PREFIX=$( (/home/linuxbrew/.linuxbrew/bin/brew --prefix || brew --prefix) 2>/dev/null )
 fi
+command -v "${CURL:=curl}" &>/dev/null ||
+    { echo "$0: ERROR: \`$_install_cmd curl\` to install $CURL." >&2; exit 1; }
 
 # shellcheck disable=SC2034
 SCRIPT_NAME=$(basename "${BASH_SOURCE[0]}")
@@ -90,38 +93,29 @@ function err { printf "$SCRIPT_NAME: ❗ ERROR: %s\n" "$@" >&2; }
 # shellcheck disable=SC2329
 function abort { printf "$SCRIPT_NAME: ❌ ERROR: %s\n" "$@" >&2; exit 1; }
 
-#### Config
-
-# Config: number of digest characters to compare (partial match)
-CHECK_DIGEST_CHARS="${CHECK_DIGEST_CHARS:-7}"
-
 #### Options
 
 # Defaults
 opt_verbose=
 opt_debug=
-# NOTE:
-# - 2026-08-22 For GHCR, we didn't actually look up the default maximum number of tags returned by the GHCR API,
-#   so we don't know what the effective limit would be.
-# - 2026-08-22 For Docker Hub, we don't paginate, so we effectively have a limit of 100 already.
-opt_ghcr_limit=100
+opt_ghcr_method=auto
 
 function usage {
     local exit_code="${1:-1}"
     cat <<END >&2
-Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-d|--debug] [--ghcr-limit value] <container-name-or-id>
+Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-d|--debug] [--ghcr-method method] <container-name-or-id> [...]
         -h|--help: get help
         -v|--verbose: turn on verbose mode
         -d|--debug: turn on debug mode
-        --ghcr-limit: to speed up GHCR, limit tags to check (default: $opt_ghcr_limit).
-            Tags are sorted first so version-like tags (e.g. "1.2.3" or "v1.2.3")
-            are checked first, newest first; other tags keep their original
-            order. Set to 0 for unlimited.
+        --ghcr-method: select the GHCR lookup method (default: $opt_ghcr_method):
+            auto: try the Packages API, then prompt if credentials are unusable
+            packages: use only the GitHub Packages API; never prompt or fall back
+            anonymous: use only the anonymous OCI scan; never prompt
 END
     exit "$exit_code"
 }
 
-opts=$($GETOPT --options hvnd --long help,verbose,dry-run,debug,ghcr-limit: --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$($GETOPT --options hvnd --long help,verbose,dry-run,debug,ghcr-method: --name "$SCRIPT_NAME" -- "$@") || usage
 eval set -- "$opts"
 
 while true; do
@@ -129,20 +123,226 @@ while true; do
         -h | --help) usage 0;;
         -v | --verbose) opt_verbose=opt_verbose; shift ;;
         -d | --debug) opt_debug=opt_debug; shift ;;
-        --ghcr-limit) opt_ghcr_limit="$2"; shift 2 ;;
+        --ghcr-method) opt_ghcr_method="$2"; shift 2 ;;
         --) shift; break ;;
         *) abort "🐛 INTERNAL: unrecognized option '$1'" ;;
     esac
 done
 
-if [[ $# -ne 1 ]]; then
+case "$opt_ghcr_method" in
+auto | packages | anonymous) ;;
+*) abort "--ghcr-method must be 'auto', 'packages', or 'anonymous'" ;;
+esac
+
+if [[ $# -lt 1 ]]; then
     usage 1
 fi
+
+# Look up an active GHCR package version by immutable digest. GitHub's Packages
+# API exposes the digest, timestamps, and current tags in the same object, so
+# no tag-by-tag manifest lookup is needed.
+#
+# Return values:
+#   0: version found (the version object is printed as compact JSON)
+#   1: API queried successfully, but no active version has this digest
+#   2: API could not be queried (usually authentication or rate limiting)
+function ghcr_package_version_by_digest {
+    local ghcr_repository="$1"
+    local digest="$2"
+    local owner package_name package_encoded owner_kind endpoint response_tmp match
+    local queried_api=
+
+    owner="${ghcr_repository%%/*}"
+    package_name="${ghcr_repository#*/}"
+    if [[ -z "$owner" || -z "$package_name" || "$package_name" == "$owner" ]]; then
+        return 2
+    fi
+
+    # shellcheck disable=SC2016  # jq expression, not a shell expansion
+    package_encoded=$($JQ -rn --arg value "$package_name" '$value | @uri')
+
+    command -v "${GH:=gh}" &>/dev/null || return 2
+    response_tmp=$(mktemp)
+
+    # A GHCR namespace can belong to either an organization or a user. Try
+    # both owner-specific Packages API endpoints.
+    for owner_kind in orgs users; do
+        endpoint="/$owner_kind/$owner/packages/container/$package_encoded/versions?per_page=100"
+        info "Searching GitHub package versions for $owner_kind/$owner/$package_name"
+        if ! "$GH" api --paginate "$endpoint" >"$response_tmp" 2>/dev/null; then
+            continue
+        fi
+        queried_api=1
+
+        # gh emits one JSON array per page. Combine the pages and use GitHub's
+        # creation timestamp as the recency signal before selecting the digest.
+        # shellcheck disable=SC2016  # jq expression, not a shell expansion
+        match=$(
+            $JQ -sc --arg digest "$digest" '
+                (add // [])
+                | sort_by(.created_at)
+                | reverse
+                | first(.[] | select(.name == $digest)) // empty
+            ' "$response_tmp"
+        )
+        if [[ -n "$match" ]]; then
+            rm -f "$response_tmp"
+            printf '%s\n' "$match"
+            return 0
+        fi
+    done
+
+    rm -f "$response_tmp"
+    [[ -n "$queried_api" ]] && return 1
+    return 2
+}
+
+# Print every current GHCR tag whose manifest has the requested digest. This
+# uses only GHCR's anonymous OCI Registry API, but requires one request per tag.
+function ghcr_tags_by_digest_anonymously {
+    local ghcr_repository="$1"
+    local digest="$2"
+    local auth_header realm service scope token
+    local tags="" next_url next_link page_tags tag manifest_digest
+    local header_tmp body_tmp checked=0
+    local -a token_args spinner=('|' '/' '-' $'\\')
+
+    if ! auth_header=$(
+        $CURL -sS -D - -o /dev/null "https://ghcr.io/v2/$ghcr_repository/tags/list" |
+            awk 'tolower($1) == "www-authenticate:" { $1=""; sub(/^ /, ""); print; exit }' |
+            tr -d '\r'
+    ); then
+        return 1
+    fi
+    realm=$(sed -n 's/.*realm="\([^"]*\)".*/\1/p' <<<"$auth_header")
+    service=$(sed -n 's/.*service="\([^"]*\)".*/\1/p' <<<"$auth_header")
+    scope=$(sed -n 's/.*scope="\([^"]*\)".*/\1/p' <<<"$auth_header")
+    [[ -n "$realm" ]] || return 1
+
+    token_args=(-fsS -G)
+    [[ -n "$service" ]] && token_args+=(--data-urlencode "service=$service")
+    [[ -n "$scope" ]] && token_args+=(--data-urlencode "scope=$scope")
+    info "Requesting an anonymous GHCR pull token"
+    if ! token=$(
+        $CURL "${token_args[@]}" "$realm" |
+            $JQ -r '.token // .access_token // empty'
+    ); then
+        return 1
+    fi
+    [[ -n "$token" ]] || return 1
+
+    header_tmp=$(mktemp)
+    body_tmp=$(mktemp)
+    next_url="https://ghcr.io/v2/$ghcr_repository/tags/list?n=100"
+    while [[ -n "$next_url" ]]; do
+        info "Listing GHCR tags from: $next_url"
+        if ! $CURL -fsS -H "Authorization: Bearer $token" \
+                -D "$header_tmp" -o "$body_tmp" "$next_url"; then
+            rm -f "$header_tmp" "$body_tmp"
+            return 1
+        fi
+
+        page_tags=$($JQ -r '.tags[]?' "$body_tmp")
+        if [[ -n "$page_tags" ]]; then
+            tags+="${tags:+$'\n'}$page_tags"
+        fi
+
+        next_link=$(
+            perl -ne '
+                if (/^Link:\s*(.*)/i) {
+                    for (split /,\s*/, $1) {
+                        if (/<([^>]+)>;\s*rel="next"/) {
+                            print "$1\n";
+                            exit;
+                        }
+                    }
+                }
+            ' "$header_tmp"
+        )
+        case "$next_link" in
+        http://* | https://*) next_url="$next_link" ;;
+        /*) next_url="https://ghcr.io$next_link" ;;
+        *) next_url="" ;;
+        esac
+    done
+
+    if [[ -z ${opt_verbose-} ]]; then
+        printf 'Searching GHCR tags anonymously... %s (0 checked)' "${spinner[0]}" >&2
+    fi
+    while IFS= read -r tag; do
+        [[ -n "$tag" ]] || continue
+        info "Resolving GHCR tag: $tag"
+        if $CURL -fsS -H "Authorization: Bearer $token" \
+                -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+                -D "$header_tmp" -o /dev/null \
+                "https://ghcr.io/v2/$ghcr_repository/manifests/$tag" 2>/dev/null; then
+            manifest_digest=$(
+                awk 'tolower($1) == "docker-content-digest:" { gsub("\r", "", $2); print $2; exit }' "$header_tmp"
+            )
+            if [[ "$manifest_digest" == "$digest" ]]; then
+                printf '%s\n' "$tag"
+            fi
+        fi
+        ((++checked))
+        if [[ -z ${opt_verbose-} ]]; then
+            printf '\rSearching GHCR tags anonymously... %s (%d checked)' \
+                "${spinner[checked % 4]}" "$checked" >&2
+        fi
+    done <<<"$tags"
+    if [[ -z ${opt_verbose-} ]]; then
+        printf '\rSearching GHCR tags anonymously... done (%d checked)\n' "$checked" >&2
+    fi
+
+    rm -f "$header_tmp" "$body_tmp"
+}
+
+# Ask how to proceed when the Packages API cannot be used. The selected action
+# is printed as either "refresh" or "anonymous".
+function choose_ghcr_fallback {
+    local can_refresh="$1"
+    local choice
+
+    if [[ ! -t 0 && ! -t 1 && ! -t 2 ]]; then
+        return 1
+    fi
+
+    echo "$SCRIPT_NAME: GitHub Packages API credentials with read:packages scope are unavailable." >&2
+    if [[ -n "$can_refresh" ]]; then
+        echo "  [r] Run 'gh auth refresh -s read:packages', then retry" >&2
+        echo "  [a] Use the slower anonymous OCI tag scan" >&2
+        echo "  [s] Skip GHCR lookup and exit" >&2
+        while true; do
+            printf "Choose [r/a/s]: " >&2
+            IFS= read -r choice </dev/tty || return 1
+            case "$choice" in
+            r | R) printf 'refresh\n'; return 0 ;;
+            a | A) printf 'anonymous\n'; return 0 ;;
+            s | S) printf 'skip\n'; return 0 ;;
+            esac
+        done
+    fi
+
+    printf "The gh CLI is unavailable. [y] Use the slower anonymous OCI tag scan [s] Skip and exit. Choose [y/s]: " >&2
+    IFS= read -r choice </dev/tty || return 1
+    case "$choice" in
+    y | Y | yes | YES | Yes) printf 'anonymous\n' ;;
+    s | S) printf 'skip\n' ;;
+    *) return 1 ;;
+    esac
+}
 
 ##############################################################################
 #### Main
 
-container="$1"
+container_index=0
+for container in "$@"; do
+    if (( container_index > 0 )); then
+        separator_columns="${COLUMNS:-$(tput cols 2>/dev/null || true)}"
+        (( separator_columns > 0 )) || separator_columns=80
+        printf '%*s\n' "$separator_columns" '' | tr ' ' '-'
+    fi
+    ((++container_index))
+    skip_container=
 
 # 1) Find the local Docker image that this container is using.
 image_id=$(
@@ -170,8 +370,6 @@ repo_sha="${repo_digest##*@}"
 
 # Canonicalize the digest: strip any "sha256:" prefix
 repo_sha="${repo_sha#sha256:}"
-# Only compare the first $CHECK_DIGEST_CHARS characters (partial match)
-digest_prefix="${repo_sha:0:$CHECK_DIGEST_CHARS}"
 
 # Local tag, if any, for display (a container can be running an untagged image).
 local_tag=$(
@@ -189,153 +387,174 @@ echo "Container: $container"
 echo
 echo "Local Image ID: $image_id"
 echo "Repository:     $repo"
-echo "Repository sha: $repo_sha"
+echo "Package digest: ${repo_digest##*@}"
 echo
 echo "Local tag:  $local_tag"
 echo
-echo "Registry tag(s):"
+registry_tags=""
+ghcr_lookup_status=""
+ghcr_version_json=""
 
 case "$repo" in
 ghcr.io/*)
-    # GitHub Container Registry (ghcr.io) - use the OCI Registry API directly.
-    # Anonymous access works for public packages; no GitHub repo permissions needed.
     ghcr_path="${repo#ghcr.io/}"
-
-    # --- Bearer-token challenge flow (anonymous) ---
-    # The first request returns 401 with a WWW-Authenticate header telling us
-    # where to request an anonymous token.
-    auth_header=$(
-        curl -sS -D - -o /dev/null \
-            "https://ghcr.io/v2/$ghcr_path/tags/list" |
-            awk 'tolower($1) == "www-authenticate:" { $1=""; sub(/^ /, ""); print; exit }' |
-            tr -d '\r'
-    )
-    realm=$(sed -n 's/.*realm="\([^"]*\)".*/\1/p' <<<"$auth_header")
-    service=$(sed -n 's/.*service="\([^"]*\)".*/\1/p' <<<"$auth_header")
-    scope=$(sed -n 's/.*scope="\([^"]*\)".*/\1/p' <<<"$auth_header")
-
-    if [[ -z "$realm" ]]; then
-        echo "Error: Could not determine token realm from GHCR" >&2
-        exit 1
-    fi
-
-    token_url="$realm"
-    query=""
-    [[ -n "$service" ]] && query="service=$service"
-    [[ -n "$scope" ]] && query="${query:+&}scope=$scope"
-    [[ -n "$query" ]] && token_url+="?$query"
-
-    info "Invoking: curl -fsS \"$token_url\""
-    token=$(curl -fsS "$token_url" | $JQ -r '.token // .access_token // empty')
-    if [[ -z "$token" ]]; then
-        echo "Error: Could not obtain anonymous token from GHCR" >&2
-        exit 1
-    fi
-
-    # --- Get the list of tags ---
-    info "Invoking: curl -fsS -H \"Authorization: Bearer <token>\" \"https://ghcr.io/v2/$ghcr_path/tags/list\""
-    tags_response=$(
-        curl -fsS \
-            -H "Authorization: Bearer $token" \
-            "https://ghcr.io/v2/$ghcr_path/tags/list"
-    ) || {
-        echo "Error: Failed to list tags for $repo (is the package public?)" >&2
-        exit 1
-    }
-    tags=$($JQ -r '.tags[]?' <<<"$tags_response")
-
-    # Sort tags before trimming to --ghcr-limit, so the limit checks the most
-    # relevant tags first.  Tags that look like version numbers (e.g. "1.2.3"
-    # or "v1.2.3") come first, newest first (`sort -Vr`); all other tags
-    # (e.g. "latest", "nightly") keep their original relative order.
-    if [[ -n "$tags" ]]; then
-        tags=$(
-            {
-                # Non-version-like tags are first, in their original relative order.
-                awk '!/^[vV]?[0-9]+(\.[0-9]+)+(-.*)?$/' <<<"$tags"
-                # Version-like tags (optional 'v'/'V' followed by a digit),
-                # newest version first.
-                awk '/^[vV]?[0-9]+(\.[0-9]+)+(-.*)?$/' <<<"$tags" | $SORT -Vr -s
-            }
-        )
-    fi
-    if [[ "$opt_ghcr_limit" -gt 0 ]]; then
-        tags=$(head -n "$opt_ghcr_limit" <<<"$tags")
-    fi
-    info "Found remote tags: $(tr '\n' ' ' <<<"$tags")"
-
-    # --- For each tag, fetch the manifest and compare its digest ---
-    # The RepoDigest of a local image is the digest of the manifest (or
-    # manifest list) that the tag pointed at when the image was pulled.
-    # Querying a tag's manifest returns that same digest in the
-    # Docker-Content-Digest response header, so that's what we compare.
-    accept="application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
-    hub_tags=""
-    header_tmp=$(mktemp)
-    while IFS= read -r tag; do
-        [[ -z "$tag" ]] && continue
-        info "Invoking: curl -fsS -H \"Authorization: Bearer <token>\" -H \"Accept: $accept\" -D $header_tmp -o /dev/null \"https://ghcr.io/v2/$ghcr_path/manifests/$tag\""
-        if ! curl -fsS \
-                -H "Authorization: Bearer $token" \
-                -H "Accept: $accept" \
-                -D "$header_tmp" \
-                -o /dev/null \
-                "https://ghcr.io/v2/$ghcr_path/manifests/$tag" 2>/dev/null; then
-            continue
+    ghcr_digest="sha256:$repo_sha"
+    if [[ "$opt_ghcr_method" == anonymous ]]; then
+        if ! registry_tags=$(ghcr_tags_by_digest_anonymously "$ghcr_path" "$ghcr_digest"); then
+            abort "Anonymous GHCR lookup failed for $repo (is the package public?)"
         fi
-        manifest_digest=$(awk 'tolower($1) == "docker-content-digest:" { gsub("\r", "", $2); print $2; exit }' "$header_tmp")
+        ghcr_lookup_status=anonymous
+    else
+        while true; do
+            if ghcr_version_json=$(ghcr_package_version_by_digest "$ghcr_path" "$ghcr_digest"); then
+                ghcr_lookup_status=found
+                registry_tags=$($JQ -r '.metadata.container.tags[]?' <<<"$ghcr_version_json")
+                break
+            fi
+            case "$?" in
+            1)
+                ghcr_lookup_status=not-found
+                break
+                ;;
+            esac
 
-        if [[ -n $opt_verbose ]]; then
-            debug "Comparing tag '$tag' with manifest digest '$manifest_digest' against prefix '$digest_prefix'" >&2
-        fi
+            if [[ "$opt_ghcr_method" == packages ]]; then
+                abort "GitHub Packages API lookup failed; authenticate gh with read:packages scope"
+            fi
 
-        # Explicit startswith check: does the manifest digest begin with our prefix?
-        case "${manifest_digest#sha256:}" in
-        "$digest_prefix"*)
-            hub_tags+="$tag"$'\n'
-            info "✔️ Found matching registry tag: $tag"
-            ;;
-        esac
-    done <<<"$tags"
-    rm -f "$header_tmp"
-    hub_tags=${hub_tags%$'\n'}
+            if command -v "${GH:=gh}" &>/dev/null; then
+                can_refresh=1
+            else
+                can_refresh=""
+            fi
+            if ! ghcr_choice=$(choose_ghcr_fallback "$can_refresh"); then
+                abort "GHCR lookup cancelled; no usable GitHub Packages credentials and anonymous scanning was not approved"
+            fi
+
+            case "$ghcr_choice" in
+            refresh)
+                if ! "$GH" auth refresh -s read:packages </dev/tty >/dev/tty; then
+                    warn "gh authentication refresh failed"
+                fi
+                # Retry the Packages API whether refresh succeeded or failed:
+                # the authentication flow may still have updated the token.
+                ;;
+            anonymous)
+                if ! registry_tags=$(ghcr_tags_by_digest_anonymously "$ghcr_path" "$ghcr_digest"); then
+                    abort "Anonymous GHCR lookup failed for $repo (is the package public?)"
+                fi
+                ghcr_lookup_status=anonymous
+                break
+                ;;
+            skip)
+                skip_container=1
+                break
+                ;;
+            esac
+        done
+    fi
     ;;
 
 *)
-    # Docker Hub.  The RepoDigest may be prefixed with "docker.io/" and/or
-    # use the "library/" prefix for official images; normalize for the API.
-    hub_repo="$repo"
-    case "$repo" in
-    docker.io/* | index.docker.io/*)
-        # e.g. docker.io/library/nginx -> library/nginx
-        hub_repo="${repo#*/}"
-        ;;
-    */*/*)
-        echo "Repository $repo is not supported by this script" >&2
-        exit 1
-        ;;
-    esac
+    first_component="${repo%%/*}"
+    if [[ "$repo" != */* ||
+            "$first_component" != *.* && "$first_component" != *:* &&
+            "$first_component" != localhost ]] ||
+            [[ "$first_component" == docker.io ||
+               "$first_component" == index.docker.io ||
+               "$first_component" == registry-1.docker.io ]]; then
+        # Docker Hub. Normalize official images and follow every API page.
+        hub_repo="$repo"
+        case "$hub_repo" in
+        docker.io/* | index.docker.io/* | registry-1.docker.io/*)
+            hub_repo="${hub_repo#*/}"
+            ;;
+        esac
+        if [[ "$hub_repo" != */* ]]; then
+            hub_repo="library/$hub_repo"
+        fi
 
-    # Official images are stored under library/<repo> in Docker Hub.
-    if [[ "$hub_repo" != */* ]]; then
-        hub_repo="library/$hub_repo"
+        next_url="https://hub.docker.com/v2/repositories/$hub_repo/tags/?page_size=100"
+        response_tmp=$(mktemp)
+        while [[ -n "$next_url" ]]; do
+            info "Listing Docker Hub tags from: $next_url"
+            if ! $CURL -fsS -o "$response_tmp" "$next_url"; then
+                rm -f "$response_tmp"
+                abort "Failed to list tags for $repo"
+            fi
+            # shellcheck disable=SC2016  # jq expression, not a shell expansion
+            matching_tags=$(
+                $JQ -r --arg digest "$repo_sha" '
+                    .results[]
+                    | select(((.digest // "") | ltrimstr("sha256:")) == $digest)
+                    | .name
+                ' "$response_tmp"
+            )
+            if [[ -n "$matching_tags" ]]; then
+                registry_tags+="${registry_tags:+$'\n'}$matching_tags"
+            fi
+            next_url=$($JQ -r '.next // empty' "$response_tmp")
+        done
+        rm -f "$response_tmp"
+    else
+        # For other OCI registries, skopeo supplies the same registry-level
+        # algorithm and reuses configured registry credentials when available.
+        SKOPEO="${SKOPEO:-skopeo}"
+        command -v "$SKOPEO" &>/dev/null ||
+            abort "Install skopeo to query registry '$first_component'"
+
+        info "Listing tags with skopeo for $repo"
+        tags=$(
+            $SKOPEO list-tags "docker://$repo" |
+                $JQ -r '.Tags[]?'
+        )
+        while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+            info "Resolving registry tag with skopeo: $tag"
+            if ! manifest_digest=$(
+                $SKOPEO inspect --format '{{.Digest}}' "docker://$repo:$tag" 2>/dev/null
+            ); then
+                continue
+            fi
+            if [[ "${manifest_digest#sha256:}" == "$repo_sha" ]]; then
+                registry_tags+="$tag"$'\n'
+            fi
+        done <<<"$tags"
+        registry_tags=${registry_tags%$'\n'}
     fi
-
-    info "Invoking: curl -fsS \"https://hub.docker.com/v2/repositories/$hub_repo/tags/?page_size=100\""
-
-    # The tag-level ".digest" in the Hub API is the same manifest digest the
-    # RepoDigest records, so compare against it.
-    hub_tags=$(
-        curl -fsS \
-            "https://hub.docker.com/v2/repositories/$hub_repo/tags/?page_size=100" |
-            $JQ -r --arg digest_prefix "$digest_prefix" '
-                .results[]
-                | select((.digest // "") | ltrimstr("sha256:") | startswith($digest_prefix))
-                | .name
-                '
-    )
     ;;
 esac
 
+if [[ -n "$skip_container" ]]; then
+    continue
+fi
+
 echo "Registry tag(s):"
-printf '%s\n' "${hub_tags:-<not found>}"
+printf '%s\n' "${registry_tags:-<none>}"
+
+case "$ghcr_lookup_status" in
+found)
+    package_current_tags=$(
+        $JQ -r '
+            .metadata.container.tags // []
+            | if length == 0 then "none" else join(", ") end
+        ' <<<"$ghcr_version_json"
+    )
+    echo
+    echo "GHCR package info:"
+    echo "Created:      $($JQ -r '.created_at // "unknown"' <<<"$ghcr_version_json")"
+    echo "Updated:      $($JQ -r '.updated_at // "unknown"' <<<"$ghcr_version_json")"
+    if [[ "$package_current_tags" == none ]]; then
+        echo "Note: the digest is still an active GHCR package version, but no current tag points to it."
+    fi
+    ;;
+not-found)
+    warn "No active GHCR package version was found for sha256:$repo_sha"
+    ;;
+anonymous)
+    if [[ -z "$registry_tags" ]]; then
+        warn "No current GHCR tag was found for sha256:$repo_sha"
+    fi
+    ;;
+esac
+done
