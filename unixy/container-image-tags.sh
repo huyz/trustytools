@@ -9,6 +9,13 @@
 # against the registries.  In contrast, the local image ID (a hash of the
 # local image config) cannot be used to match registry tags.
 #
+# Why not use Skopeo for every registry?  Skopeo can list tags and inspect a
+# tag's manifest, but it cannot reverse-lookup tags by digest.  Its generic
+# approach therefore requires one manifest lookup per tag.  Docker Hub's tags
+# API and GitHub's Packages API include digests and tags in their paginated
+# results, making those common lookups much faster.  Skopeo remains the
+# portable fallback for other OCI registries and their configured credentials.
+#
 # Steps:
 #   1. Take a container name or ID.
 #   2. Find which local Docker image that container is using.
@@ -26,7 +33,7 @@
 # - To list all the Repo digests for your containers:
 #    docker image ls --digests --format 'table {{.Repository}}\t{{.Tag}}\t{{.Digest}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}'
 # - To query all local containers:
-#   docker-image-tags $(docker ps -a --format "{{.Names}}")
+#   container-image-tags $(docker ps -a --format "{{.Names}}")
 #
 # 2026-08-22 Authored mostly by DeepSeek V4 Flash and OpenAI's GPT 5.6 Sol
 
