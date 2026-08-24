@@ -1,7 +1,7 @@
 #!/bin/bash
-# Given the name or ID of a Docker container, this prints the repository and
-# tag(s) of the image that container is using, if any, by querying Docker Hub
-# or GitHub Container Registry.
+# Given a Docker container, local image, or registry digest, this prints the
+# current remote registry tag(s), if any.  Each argument is classified by its
+# shape and, where necessary, by probing the local Docker daemon.
 #
 # The lookup is done using the image's RepoDigest (e.g. repo@sha256:...).
 # The RepoDigest is the manifest digest that Docker resolved from a registry
@@ -17,10 +17,9 @@
 # portable fallback for other OCI registries and their configured credentials.
 #
 # Steps:
-#   1. Take a container name or ID.
-#   2. Find which local Docker image that container is using.
-#   3. Find that image's RepoDigest.
-#   4. Find and print the current registry tag(s) for that digest.
+#   1. Resolve each argument as a container, local image, or registry digest.
+#   2. Find the associated repository digest.
+#   3. Find and print the current registry tag(s) for that digest.
 #
 # Prerequisites:
 # - curl
@@ -94,6 +93,8 @@ function debug { [[ -z ${opt_debug-} ]] || printf "$SCRIPT_NAME: 🔧 DEBUG: %s\
 # shellcheck disable=SC2329
 function info { [[ -z ${opt_verbose-} ]] || printf "%s\n" "$@" >&2; }
 # shellcheck disable=SC2329
+function notice { printf "$SCRIPT_NAME: ℹ️ %s\n" "$@" >&2; }
+# shellcheck disable=SC2329
 function warn { printf "$SCRIPT_NAME: ⚠️ WARNING: %s\n" "$@" >&2; }
 # shellcheck disable=SC2329
 function err { printf "$SCRIPT_NAME: ❗ ERROR: %s\n" "$@" >&2; }
@@ -110,7 +111,7 @@ opt_ghcr_method=auto
 function usage {
     local exit_code="${1:-1}"
     cat <<END >&2
-Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-d|--debug] [--ghcr-method method] <container-name-or-id> [...]
+Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-d|--debug] [--ghcr-method method] <container-or-image-or-digest> [...]
         -h|--help: get help
         -v|--verbose: turn on verbose mode
         -d|--debug: turn on debug mode
@@ -118,6 +119,14 @@ Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-d|--debug] [--ghcr-method metho
             auto: try the Packages API, then prompt if credentials are unusable
             packages: use only the GitHub Packages API; never prompt or fall back
             anonymous: use only the anonymous OCI scan; never prompt
+
+Arguments are interpreted as follows:
+        repository@sha256:...: use this registry digest directly
+        repository:*: immediately match every local tag in that repository
+        image name with an explicit tag: inspect that exact local image
+        SHA-like value: try a local container ID, then a local image ID, then a registry digest
+        image name without a tag (including names with '/'): try ':latest', then match every local repository tag
+        any other value: try a container name before treating it as an image name
 END
     exit "$exit_code"
 }
@@ -338,37 +347,280 @@ function choose_ghcr_fallback {
     esac
 }
 
+# Resolve a local image reference and populate the image fields used by the
+# main lookup.  An image can exist locally without a RepoDigest, so an empty
+# repo_digest still counts as a successful image resolution.
+function inspect_local_image {
+    local image_ref="$1"
+    local preferred_repository="${2:-}"
+    local preferred_tag="${3:-}"
+    local repo_digests repo_tags candidate candidate_repository
+
+    if ! image_id=$(
+        $DOCKER image inspect "$image_ref" --format '{{.Id}}' 2>/dev/null
+    ); then
+        return 1
+    fi
+    repo_digests=$(
+        $DOCKER image inspect "$image_id" \
+            --format='{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null
+    ) || return 1
+    repo_tags=$(
+        $DOCKER image inspect "$image_id" \
+            --format='{{range .RepoTags}}{{println .}}{{end}}' 2>/dev/null
+    ) || return 1
+
+    repo_digest=
+    local_tag=
+    if [[ -n "$preferred_repository" ]]; then
+        while IFS= read -r candidate; do
+            [[ -n "$candidate" ]] || continue
+            if [[ "${candidate%%@*}" == "$preferred_repository" ]]; then
+                repo_digest="$candidate"
+                break
+            fi
+        done <<<"$repo_digests"
+        if [[ -n "$preferred_tag" ]] && grep -Fxq -- "$preferred_tag" <<<"$repo_tags"; then
+            local_tag="$preferred_tag"
+        else
+            while IFS= read -r candidate; do
+                [[ -n "$candidate" ]] || continue
+                candidate_repository="${candidate%:*}"
+                if [[ "$candidate_repository" == "$preferred_repository" ]]; then
+                    local_tag="$candidate"
+                    break
+                fi
+            done <<<"$repo_tags"
+        fi
+    else
+        repo_digest="${repo_digests%%$'\n'*}"
+        local_tag="${repo_tags%%$'\n'*}"
+    fi
+}
+
+# Print every distinct local image ID whose repository name exactly matches
+# the requested untagged name.  Tags are deliberately ignored here.
+function image_ids_for_repository {
+    local wanted_repository="$1"
+    local image_rows repository image_id_candidate
+    local matches=
+
+    image_rows=$(
+        $DOCKER image ls --no-trunc --format '{{.Repository}}\t{{.ID}}' 2>/dev/null
+    ) || return 1
+    while IFS=$'\t' read -r repository image_id_candidate; do
+        if [[ "$repository" == "$wanted_repository" && -n "$image_id_candidate" ]]; then
+            matches+="${matches:+$'\n'}$image_id_candidate"
+        fi
+    done <<<"$image_rows"
+
+    [[ -n "$matches" ]] || return 1
+    printf '%s\n' "$matches" | sort -u
+}
+
+# Strip an explicit tag from an image reference without mistaking a registry
+# port (as in localhost:5000/repo) for a tag.
+function repository_from_image_reference {
+    local image_reference="$1"
+    local final_component
+
+    image_reference="${image_reference%%@*}"
+    final_component="${image_reference##*/}"
+    if [[ "$final_component" == *:* ]]; then
+        image_reference="${image_reference%:*}"
+    fi
+    printf '%s\n' "$image_reference"
+}
+
+# Find locally known repository digests whose complete SHA matches a bare
+# registry digest.  A content digest does not identify its repository, so this
+# local metadata is required before a registry can be queried.
+function repo_digests_for_sha {
+    local wanted_sha="$1"
+    local image_ids candidate_repo_digests image candidate digest
+    local matches=
+
+    image_ids=$($DOCKER image ls --no-trunc --quiet 2>/dev/null) || return 1
+    while IFS= read -r image; do
+        [[ -n "$image" ]] || continue
+        candidate_repo_digests=$(
+            $DOCKER image inspect "$image" \
+                --format='{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null
+        ) || continue
+        while IFS= read -r candidate; do
+            [[ -n "$candidate" ]] || continue
+            digest="${candidate##*@}"
+            if [[ "${digest#sha256:}" == "$wanted_sha" ]]; then
+                matches+="${matches:+$'\n'}$candidate"
+            fi
+        done <<<"$candidate_repo_digests"
+    done <<<"$image_ids"
+
+    [[ -n "$matches" ]] || return 1
+    printf '%s\n' "$matches" | sort -u
+}
+
 ##############################################################################
 #### Main
 
-container_index=0
-for container in "$@"; do
-    if (( container_index > 0 )); then
+input_index=0
+for input in "$@"; do
+    if (( input_index > 0 )); then
         separator_columns="${COLUMNS:-$(tput cols 2>/dev/null || true)}"
         (( separator_columns > 0 )) || separator_columns=80
         printf '%*s\n' "$separator_columns" '' | tr ' ' '-'
     fi
-    ((++container_index))
-    skip_container=
+    ((++input_index))
+    skip_input=
+    container=
+    image_id=
+    repo_digest=
+    local_tag=
+    wildcard_image_ids=
+    wildcard_reference=
+    wildcard_repository=
 
-# 1) Find the local Docker image that this container is using.
-image_id=$(
-    $DOCKER container inspect "$container" --format '{{.Image}}'
-) || abort "Cannot inspect container '$container'"
+# A full repository digest is already unambiguous and does not need local
+# Docker metadata.
+if [[ "$input" == *@* ]]; then
+    if [[ "$input" =~ ^.+@sha256:[0-9a-f]{64}$ ]]; then
+        repo_digest="$input"
+        notice "Interpreting '$input' as a complete registry digest reference."
+    else
+        abort "'$input' looks like a registry digest reference, but expected repository@sha256:<64 lowercase hex characters>"
+    fi
 
-# 2) Find that image's RepoDigest.  The RepoDigest (e.g. repo@sha256:...) is
-#    the manifest digest resolved from the registry at pull time, which is the
-#    digest to match against.  Do NOT use the image ID -- that is only a local
-#    digest of the image config and cannot be matched to registry tags.
-repo_digest=$(
-    $DOCKER image inspect "$image_id" \
-        --format='{{range .RepoDigests}}{{println .}}{{end}}' |
-        head -n1
-)
+# SHA-like inputs are inherently ambiguous because Docker container IDs and
+# local image IDs are both hashes.  Probe in the documented order.
+elif [[ "$input" =~ ^([Ss][Hh][Aa]256:)?[0-9a-fA-F]{12,64}$ ]]; then
+    if resolved_image_id=$(
+        $DOCKER container inspect "$input" --format '{{.Image}}' 2>/dev/null
+    ); then
+        container="$input"
+        inspect_local_image "$resolved_image_id" ||
+            abort "Container '$container' refers to image '$resolved_image_id', but that image cannot be inspected"
+        notice "Resolved SHA-like '$input' as a local container ID (image $image_id)."
+    elif inspect_local_image "$input"; then
+        notice "Resolved SHA-like '$input' as local image ID $image_id."
+    else
+        registry_sha="$input"
+        [[ "$registry_sha" == *:* ]] && registry_sha="${registry_sha#*:}"
+        notice "No local container or image ID matched '$input'; assuming it is a registry digest."
+        if [[ ! "$registry_sha" =~ ^[0-9a-f]{64}$ ]]; then
+            abort "A registry digest must contain exactly 64 lowercase hex characters; pass repository@sha256:<digest> if it is not locally known"
+        fi
+        if ! matching_repo_digests=$(repo_digests_for_sha "$registry_sha"); then
+            abort "Cannot determine the repository for sha256:$registry_sha from local images; pass repository@sha256:$registry_sha"
+        fi
+        repo_digest="${matching_repo_digests%%$'\n'*}"
+        if [[ "$matching_repo_digests" == *$'\n'* ]]; then
+            warn "sha256:$registry_sha is associated with multiple local repositories; using '$repo_digest'. Pass a complete repository@sha256:... argument to select another."
+        else
+            notice "Recovered registry reference '$repo_digest' from local image metadata."
+        fi
+    fi
+
+# A slash identifies an image name, as does an explicit tag in the final path
+# component.  A literal :* requests an immediate wildcard scan.  For names
+# without an explicit tag, prefer Docker's normal implicit :latest resolution
+# and only then broaden the name to a :* match.
+elif [[ "$input" == */* || "${input##*/}" == *:* ]]; then
+    preferred_repository=$(repository_from_image_reference "$input")
+    final_component="${input##*/}"
+    if [[ "$final_component" == *:* && "${final_component##*:}" == '*' ]]; then
+        if ! wildcard_image_ids=$(image_ids_for_repository "$preferred_repository"); then
+            abort "Cannot find any local image in repository '$preferred_repository'"
+        fi
+        wildcard_reference="$input"
+        wildcard_repository="$preferred_repository"
+        wildcard_count=0
+        while IFS= read -r wildcard_image_id; do
+            [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
+        done <<<"$wildcard_image_ids"
+        notice "Explicit wildcard '$input' requested; immediately checking $wildcard_count distinct local image(s)."
+    elif [[ "$final_component" == *:* ]]; then
+        inspect_local_image "$input" "$preferred_repository" "$input" ||
+            abort "Cannot inspect local image '$input'"
+        notice "Interpreting '$input' as a tagged local image reference."
+    elif inspect_local_image "$input" "$preferred_repository" "$preferred_repository:latest"; then
+        notice "Resolved '$input' using its implicit ':latest' tag; not scanning other local tags."
+    elif wildcard_image_ids=$(image_ids_for_repository "$preferred_repository"); then
+        wildcard_reference="$preferred_repository:*"
+        wildcard_repository="$preferred_repository"
+        wildcard_count=0
+        while IFS= read -r wildcard_image_id; do
+            [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
+        done <<<"$wildcard_image_ids"
+        notice "No local '$input:latest' image was found; interpreting '$input' as '$input:*' and checking $wildcard_count distinct local image(s)."
+    else
+        abort "Cannot find any local image in repository '$preferred_repository'"
+    fi
+
+# Otherwise prefer a container name, then permit an image name without an
+# explicit tag.  The image lookup follows the same :latest-before-:* rule.
+else
+    if resolved_image_id=$(
+        $DOCKER container inspect "$input" --format '{{.Image}}' 2>/dev/null
+    ); then
+        container="$input"
+        inspect_local_image "$resolved_image_id" ||
+            abort "Container '$container' refers to image '$resolved_image_id', but that image cannot be inspected"
+        notice "Resolved '$input' as a local container name (image $image_id)."
+    elif inspect_local_image "$input" "$input" "$input:latest"; then
+        notice "No container named '$input' was found; resolved the image using its implicit ':latest' tag and will not scan other local tags."
+    elif wildcard_image_ids=$(image_ids_for_repository "$input"); then
+        wildcard_reference="$input:*"
+        wildcard_repository="$input"
+        wildcard_count=0
+        while IFS= read -r wildcard_image_id; do
+            [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
+        done <<<"$wildcard_image_ids"
+        notice "No container or local '$input:latest' image was found; interpreting '$input' as '$input:*' and checking $wildcard_count distinct local image(s)."
+    else
+        abort "Cannot resolve '$input' as a local container name or local image repository"
+    fi
+fi
+
+# Most arguments resolve to one lookup.  An untagged repository without a
+# local :latest image can expand to multiple distinct image IDs.
+images_to_process="${wildcard_image_ids:-__current_resolution__}"
+wildcard_output_index=0
+seen_wildcard_repo_digests=
+while IFS= read -r image_to_process; do
+    skip_input=
+    if [[ "$image_to_process" != __current_resolution__ ]]; then
+        container=
+        inspect_local_image "$image_to_process" "$wildcard_repository" || {
+            warn "Cannot inspect wildcard image match '$image_to_process'; skipping it"
+            continue
+        }
+    fi
 
 if [[ -z "$repo_digest" ]]; then
-    echo "No repository digest found for image '$image_id' (used by container '$container')" >&2
+    if [[ -n "$container" ]]; then
+        echo "No repository digest found for image '$image_id' (used by container '$container')" >&2
+    elif [[ -n "$wildcard_image_ids" ]]; then
+        warn "No repository digest found for wildcard image '$image_id'; skipping it"
+        continue
+    else
+        echo "No repository digest found for image '$image_id'" >&2
+    fi
     exit 1
+fi
+
+if [[ -n "$wildcard_image_ids" ]]; then
+    if grep -Fxq -- "$repo_digest" <<<"$seen_wildcard_repo_digests"; then
+        notice "Skipping local image $image_id because repository digest '$repo_digest' was already checked."
+        continue
+    fi
+    seen_wildcard_repo_digests+="${seen_wildcard_repo_digests:+$'\n'}$repo_digest"
+    if (( wildcard_output_index > 0 )); then
+        separator_columns="${COLUMNS:-$(tput cols 2>/dev/null || true)}"
+        (( separator_columns > 0 )) || separator_columns=80
+        printf '%*s\n' "$separator_columns" '' | tr ' ' '-'
+    fi
+    ((++wildcard_output_index))
+    notice "Resolved '$wildcard_reference' to local image $image_id."
 fi
 
 # Split e.g. "nginx@sha256:abcd..." into repo and digest.
@@ -378,26 +630,26 @@ repo_sha="${repo_digest##*@}"
 # Canonicalize the digest: strip any "sha256:" prefix
 repo_sha="${repo_sha#sha256:}"
 
-# Local tag, if any, for display (a container can be running an untagged image).
-local_tag=$(
-    $DOCKER image inspect "$image_id" \
-        --format='{{range .RepoTags}}{{println .}}{{end}}' |
-        head -n1
-)
 if [[ -z "$local_tag" || "$local_tag" == "<none>:<none>" ]]; then
     local_tag="<none>"
 else
     local_tag="${local_tag##*:}"
 fi
 
-echo "Container: $container"
-echo
-echo "Local Image ID: $image_id"
+if [[ -n "$container" ]]; then
+    echo "Container: $container"
+    echo
+fi
+if [[ -n "$image_id" ]]; then
+    echo "Local Image ID: $image_id"
+fi
 echo "Repository:     $repo"
 echo "Package digest: ${repo_digest##*@}"
 echo
-echo "Local tag:  $local_tag"
-echo
+if [[ -n "$image_id" ]]; then
+    echo "Local tag:  $local_tag"
+    echo
+fi
 registry_tags=""
 ghcr_lookup_status=""
 ghcr_version_json=""
@@ -454,7 +706,7 @@ ghcr.io/*)
                 break
                 ;;
             skip)
-                skip_container=1
+                skip_input=1
                 break
                 ;;
             esac
@@ -532,7 +784,7 @@ ghcr.io/*)
     ;;
 esac
 
-if [[ -n "$skip_container" ]]; then
+if [[ -n "$skip_input" ]]; then
     continue
 fi
 
@@ -564,4 +816,5 @@ anonymous)
     fi
     ;;
 esac
+done <<<"$images_to_process"
 done
