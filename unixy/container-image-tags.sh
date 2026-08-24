@@ -1,7 +1,9 @@
 #!/bin/bash
-# Given a Docker container, local image, or registry digest, this prints the
-# current remote registry tag(s), if any.  Each argument is classified by its
-# shape and, where necessary, by probing the local Docker daemon.
+# Given a Docker container, local image, or registry digest, this checks
+# whether its known local tag still points to the same remote digest. It can
+# then find every current remote registry tag for that digest. Each argument
+# is classified by its shape and, where necessary, by probing the local Docker
+# daemon.
 #
 # The lookup is done using the image's RepoDigest (e.g. repo@sha256:...).
 # The RepoDigest is the manifest digest that Docker resolved from a registry
@@ -19,12 +21,14 @@
 # Steps:
 #   1. Resolve each argument as a container, local image, or registry digest.
 #   2. Find the associated repository digest.
-#   3. Find and print the current registry tag(s) for that digest.
+#   3. Check whether the known local tag still points to that remote digest.
+#   4. Optionally find and print every current registry tag for that digest.
 #
 # Prerequisites:
 # - curl
 # - jq
 # - docker CLI
+# - Docker Hub username and PAT, only if an exhaustive anonymous scan is refused
 # - authenticated gh CLI with read:packages scope, optional fast path for GHCR
 # - skopeo, only for registries other than Docker Hub and GHCR
 #
@@ -36,15 +40,17 @@
 #
 # 2026-08-22 Authored mostly by DeepSeek V4 Flash and OpenAI's GPT 5.6 Sol
 
-#### Preamble (v2026-08-14)
+#### Preamble (v2026-08-24)
 
-set -euo pipefail
-shopt -s failglob
+set -Eeuo pipefail
+shopt -s failglob inherit_errexit
+SCRIPT_NAME=${BASH_SOURCE[0]##*/}
 # shellcheck disable=SC2329
-function trap_err { echo "$(basename "${BASH_SOURCE[0]}"): ERR signal on line $(caller)" >&2; }
+function trap_err { local rc=$?; printf '%s: ERROR: command failed with status %d at %s:%d: %s\n' \
+    "$SCRIPT_NAME" "$rc" "${BASH_SOURCE[1]}" "${BASH_LINENO[0]}" "$BASH_COMMAND" >&2; return "$rc"; }
 trap trap_err ERR
-trap exit INT  # So that ^C will stop the entire script, not just the current subprocess
-export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+trap 'exit 130' INT  # Exit this shell on SIGINT rather than continuing after an interrupted command
+PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 if [[ $OSTYPE == darwin* ]]; then
     HOMEBREW_PREFIX=$( (/opt/homebrew/bin/brew --prefix || /usr/local/bin/brew --prefix || brew --prefix) 2>/dev/null )
@@ -65,41 +71,34 @@ else
         { echo "$0: ERROR: \`$_install_cmd jq\` to install $JQ." >&2; exit 1; }
     command -v "${DOCKER:=docker}" &>/dev/null || \
         { echo "$0: ERROR: \`$_install_cmd docker\` to install $DOCKER." >&2; exit 1; }
-#    _install_cmd="brew install"
-#    HOMEBREW_PREFIX=$( (/home/linuxbrew/.linuxbrew/bin/brew --prefix || brew --prefix) 2>/dev/null )
 fi
 command -v "${CURL:=curl}" &>/dev/null ||
     { echo "$0: ERROR: \`$_install_cmd curl\` to install $CURL." >&2; exit 1; }
 
+SCRIPT=$("$REALPATH" --no-symlinks "${BASH_SOURCE[0]}")
 # shellcheck disable=SC2034
-SCRIPT_NAME=$(basename "${BASH_SOURCE[0]}")
-# a) Uncomment to expand symlinks in order to find the proper .envrc for direnv
-#SCRIPT=$($REALPATH "${BASH_SOURCE[0]}")
-# b) Uncomment in the general case
-SCRIPT=$($REALPATH --no-symlinks "${BASH_SOURCE[0]}")
-# shellcheck disable=SC2034
-SCRIPT_DIR=$(dirname "$SCRIPT")
+SCRIPT_DIR=$(dirname -- "$SCRIPT")
 
 #### Utils
 
-# shellcheck disable=SC2059,SC2329
+# shellcheck disable=SC2329
 function run_cmd {
-    [[ -z ${opt_verbose-} ]] || printf "#❯%s\n" "$(printf " %q" "$@")" || true
+    [[ -z ${opt_verbose-} ]] || { printf '#❯'; printf ' %q' "$@"; printf '\n'; } >&2 || true
     [[ -n ${opt_dry_run-} ]] || "$@"
 }
 
 # shellcheck disable=SC2329
-function debug { [[ -z ${opt_debug-} ]] || printf "$SCRIPT_NAME: 🔧 DEBUG: %s\n" "$@" >&2; }
+function debug { [[ -z ${opt_debug-} ]] || printf "%s: 🔧 DEBUG: %s\n" "$SCRIPT_NAME" "$*" >&2; }
 # shellcheck disable=SC2329
-function info { [[ -z ${opt_verbose-} ]] || printf "%s\n" "$@" >&2; }
+function info { [[ -z ${opt_verbose-} ]] || printf "%s\n" "$*" >&2; }
 # shellcheck disable=SC2329
-function notice { printf "$SCRIPT_NAME: ℹ️ %s\n" "$@" >&2; }
+function warn { printf "%s: ⚠️ WARNING: %s\n" "$SCRIPT_NAME" "$*" >&2; }
 # shellcheck disable=SC2329
-function warn { printf "$SCRIPT_NAME: ⚠️ WARNING: %s\n" "$@" >&2; }
+function err { printf "%s: ❗ ERROR: %s\n" "$SCRIPT_NAME" "$*" >&2; }
 # shellcheck disable=SC2329
-function err { printf "$SCRIPT_NAME: ❗ ERROR: %s\n" "$@" >&2; }
-# shellcheck disable=SC2329
-function abort { printf "$SCRIPT_NAME: ❌ ERROR: %s\n" "$@" >&2; exit 1; }
+function abort { printf "%s: ❌ ERROR: %s\n" "$SCRIPT_NAME" "$*" >&2; exit 1; }
+
+function notice { printf "ℹ️ %s\n" "$*" >&2; }
 
 #### Options
 
@@ -107,18 +106,27 @@ function abort { printf "$SCRIPT_NAME: ❌ ERROR: %s\n" "$@" >&2; exit 1; }
 opt_verbose=
 opt_debug=
 opt_ghcr_method=auto
+opt_local_only=
+opt_all=
+docker_hub_token=
 
 function usage {
-    local exit_code="${1:-1}"
-    cat <<END >&2
-Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-d|--debug] [--ghcr-method method] <container-or-image-or-digest> [...]
+    cat <<END
+Usage: $SCRIPT_NAME [-h|--help] [-v|--verbose] [-d|--debug] [-l|--local-only | -a|--all] [--ghcr-method method] <container-or-image-or-digest> [...]
         -h|--help: get help
         -v|--verbose: turn on verbose mode
         -d|--debug: turn on debug mode
-        --ghcr-method: select the GHCR lookup method (default: $opt_ghcr_method):
-            auto: try the Packages API, then prompt if credentials are unusable
+        -l|--local-only: only check whether each known local tag still points to the local digest; never prompt or scan
+        -a|--all: check each known local tag, then scan for every remote tag matching the digest; never prompt
+        --ghcr-method: select the GHCR tag-check and exhaustive-scan method (default: $opt_ghcr_method):
+            auto: check public tags anonymously; use the Packages API for exhaustive scans and private-tag fallback
             packages: use only the GitHub Packages API; never prompt or fall back
             anonymous: use only the anonymous OCI scan; never prompt
+
+By default, each known local tag is checked first, then you are asked whether
+to scan the registry for every tag that points to the same digest.
+Docker Hub scans start anonymously. If deeper pagination requires sign-in, an
+interactive run can exchange a username and PAT for an in-memory access token.
 
 Arguments are interpreted as follows:
         repository@sha256:...: use this registry digest directly
@@ -128,17 +136,18 @@ Arguments are interpreted as follows:
         image name without a tag (including names with '/'): try ':latest', then match every local repository tag
         any other value: try a container name before treating it as an image name
 END
-    exit "$exit_code"
 }
 
-opts=$($GETOPT --options hvnd --long help,verbose,dry-run,debug,ghcr-method: --name "$SCRIPT_NAME" -- "$@") || usage
+opts=$("$GETOPT" --options hvalnd --long help,verbose,all,local-only,dry-run,debug,ghcr-method: --name "$SCRIPT_NAME" -- "$@") || { usage >&2; exit 2; }
 eval set -- "$opts"
 
 while true; do
     case "$1" in
-        -h | --help) usage 0;;
+        -h | --help) usage; exit 0 ;;
         -v | --verbose) opt_verbose=opt_verbose; shift ;;
         -d | --debug) opt_debug=opt_debug; shift ;;
+        -l | --local-only) opt_local_only=opt_local_only; shift ;;
+        -a | --all) opt_all=opt_all; shift ;;
         --ghcr-method) opt_ghcr_method="$2"; shift 2 ;;
         --) shift; break ;;
         *) abort "🐛 INTERNAL: unrecognized option '$1'" ;;
@@ -150,21 +159,24 @@ auto | packages | anonymous) ;;
 *) abort "--ghcr-method must be 'auto', 'packages', or 'anonymous'" ;;
 esac
 
-if [[ $# -lt 1 ]]; then
-    usage 1
+if [[ -n "$opt_local_only" && -n "$opt_all" ]]; then
+    abort "--local-only and --all are mutually exclusive"
 fi
 
-# Look up an active GHCR package version by immutable digest. GitHub's Packages
-# API exposes the digest, timestamps, and current tags in the same object, so
-# no tag-by-tag manifest lookup is needed.
+[[ $# -ge 1 ]] || { usage >&2; exit 1; }
+
+# Look up an active GHCR package version by immutable digest or current tag.
+# GitHub's Packages API exposes the digest, timestamps, and current tags in the
+# same object, so no tag-by-tag manifest lookup is needed.
 #
 # Return values:
 #   0: version found (the version object is printed as compact JSON)
-#   1: API queried successfully, but no active version has this digest
+#   1: API queried successfully, but no active version matched
 #   2: API could not be queried (usually authentication or rate limiting)
-function ghcr_package_version_by_digest {
+function ghcr_package_version {
     local ghcr_repository="$1"
-    local digest="$2"
+    local selector="$2"
+    local wanted="$3"
     local owner package_name package_encoded owner_kind endpoint response_tmp match
     local queried_api=
 
@@ -191,14 +203,23 @@ function ghcr_package_version_by_digest {
         queried_api=1
 
         # gh emits one JSON array per page. Combine the pages and use GitHub's
-        # creation timestamp as the recency signal before selecting the digest.
+        # creation timestamp as the recency signal before selecting a version.
         # shellcheck disable=SC2016  # jq expression, not a shell expansion
         match=$(
-            $JQ -sc --arg digest "$digest" '
+            $JQ -sc --arg selector "$selector" --arg wanted "$wanted" '
                 (add // [])
                 | sort_by(.created_at)
                 | reverse
-                | first(.[] | select(.name == $digest)) // empty
+                | first(
+                    .[]
+                    | select(
+                        if $selector == "digest" then
+                            .name == $wanted
+                        else
+                            (.metadata.container.tags // [] | index($wanted)) != null
+                        end
+                    )
+                ) // empty
             ' "$response_tmp"
         )
         if [[ -n "$match" ]]; then
@@ -213,20 +234,23 @@ function ghcr_package_version_by_digest {
     return 2
 }
 
-# Print every current GHCR tag whose manifest has the requested digest. This
-# uses only GHCR's anonymous OCI Registry API, but requires one request per tag.
-function ghcr_tags_by_digest_anonymously {
+function ghcr_package_version_by_digest {
+    ghcr_package_version "$1" digest "$2"
+}
+
+function ghcr_package_version_by_tag {
+    ghcr_package_version "$1" tag "$2"
+}
+
+# Request a repository-scoped anonymous GHCR pull token.
+function ghcr_anonymous_pull_token {
     local ghcr_repository="$1"
-    local digest="$2"
     local auth_header realm service scope token
-    local tags="" next_url next_link page_tags tag manifest_digest
-    local header_tmp body_tmp checked=0
-    local -a token_args spinner=('|' '/' '-' $'\\')
+    local -a token_args
 
     if ! auth_header=$(
         $CURL -sS -D - -o /dev/null "https://ghcr.io/v2/$ghcr_repository/tags/list" |
-            awk 'tolower($1) == "www-authenticate:" { $1=""; sub(/^ /, ""); print; exit }' |
-            tr -d '\r'
+            perl -ne 'if (/^www-authenticate:\s*(.*)/i) { print "$1\n"; exit }'
     ); then
         return 1
     fi
@@ -238,14 +262,244 @@ function ghcr_tags_by_digest_anonymously {
     token_args=(-fsS -G)
     [[ -n "$service" ]] && token_args+=(--data-urlencode "service=$service")
     [[ -n "$scope" ]] && token_args+=(--data-urlencode "scope=$scope")
-    info "Requesting an anonymous GHCR pull token"
-    if ! token=$(
+    token=$(
         $CURL "${token_args[@]}" "$realm" |
             $JQ -r '.token // .access_token // empty'
+    ) || return 1
+    [[ -n "$token" ]] || return 1
+    printf '%s\n' "$token"
+}
+
+# Return the current remote digest for one public GHCR tag without enumerating
+# any other tags. A missing tag returns 1; authentication or transport failures
+# return 2.
+function ghcr_digest_for_tag_anonymously {
+    local ghcr_repository="$1"
+    local tag="$2"
+    local tag_encoded token header_tmp http_code manifest_digest
+
+    token=$(ghcr_anonymous_pull_token "$ghcr_repository") || return 2
+    tag_encoded=$($JQ -rn --arg value "$tag" '$value | @uri')
+    header_tmp=$(mktemp)
+    if ! http_code=$(
+        $CURL -sS -I -D "$header_tmp" -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $token" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+            "https://ghcr.io/v2/$ghcr_repository/manifests/$tag_encoded"
     ); then
+        rm -f "$header_tmp"
+        return 2
+    fi
+    if [[ "$http_code" == 404 ]]; then
+        rm -f "$header_tmp"
         return 1
     fi
-    [[ -n "$token" ]] || return 1
+    if [[ "$http_code" != 200 ]]; then
+        debug "Anonymous GHCR tag lookup returned HTTP $http_code for $ghcr_repository:$tag"
+        rm -f "$header_tmp"
+        return 2
+    fi
+
+    manifest_digest=$(
+        perl -ne 'if (/^docker-content-digest:\s*(\S+)/i) { print "$1\n"; exit }' "$header_tmp"
+    )
+    rm -f "$header_tmp"
+    [[ -n "$manifest_digest" ]] || return 2
+    printf '%s\n' "$manifest_digest"
+}
+
+# Honor the requested GHCR method while preferring the inexpensive public
+# manifest check in auto mode. The Packages API fallback also supports private
+# packages when gh has read:packages access.
+function ghcr_digest_for_tag {
+    local ghcr_repository="$1"
+    local tag="$2"
+    local manifest_digest package_version lookup_status
+
+    if [[ "$opt_ghcr_method" != packages ]]; then
+        if manifest_digest=$(ghcr_digest_for_tag_anonymously "$ghcr_repository" "$tag"); then
+            printf '%s\n' "$manifest_digest"
+            return 0
+        else
+            lookup_status=$?
+        fi
+        if [[ "$lookup_status" == 1 || "$opt_ghcr_method" == anonymous ]]; then
+            return "$lookup_status"
+        fi
+    fi
+
+    if package_version=$(ghcr_package_version_by_tag "$ghcr_repository" "$tag"); then
+        manifest_digest=$($JQ -r '.name // empty' <<<"$package_version")
+        [[ -n "$manifest_digest" ]] || return 2
+        printf '%s\n' "$manifest_digest"
+        return 0
+    else
+        lookup_status=$?
+    fi
+    return "$lookup_status"
+}
+
+# Return the digest in one Docker Hub tag record without walking paginated tag
+# results. A missing tag returns 1; authentication or transport failures
+# return 2.
+function docker_hub_digest_for_tag {
+    local hub_repository="$1"
+    local tag="$2"
+    local tag_encoded response_tmp http_code manifest_digest
+    local -a request_args
+
+    tag_encoded=$($JQ -rn --arg value "$tag" '$value | @uri')
+    response_tmp=$(mktemp)
+    request_args=(-sS -o "$response_tmp" -w '%{http_code}')
+    if [[ -n "$docker_hub_token" ]]; then
+        request_args+=(-H "Authorization: Bearer $docker_hub_token")
+    fi
+    if ! http_code=$(
+        $CURL "${request_args[@]}" \
+            "https://hub.docker.com/v2/repositories/$hub_repository/tags/$tag_encoded"
+    ); then
+        rm -f "$response_tmp"
+        return 2
+    fi
+    case "$http_code" in
+    200)
+        manifest_digest=$($JQ -r '.digest // empty' "$response_tmp")
+        rm -f "$response_tmp"
+        [[ -n "$manifest_digest" ]] || return 2
+        printf '%s\n' "$manifest_digest"
+        ;;
+    404)
+        rm -f "$response_tmp"
+        return 1
+        ;;
+    *)
+        debug "Docker Hub tag lookup returned HTTP $http_code for $hub_repository:$tag"
+        rm -f "$response_tmp"
+        return 2
+        ;;
+    esac
+}
+
+# Exchange a Docker Hub username and PAT for a short-lived API access token.
+# Credentials are read from the controlling terminal, sent through stdin, and
+# retained only long enough to perform the exchange.
+function docker_hub_token_interactively {
+    local identifier secret response http_code response_body token error_message
+
+    if [[ ! -t 0 && ! -t 1 && ! -t 2 ]]; then
+        return 2
+    fi
+    printf 'Docker Hub username: ' >&2
+    IFS= read -r identifier </dev/tty || return 2
+    [[ -n "$identifier" ]] || { warn "Docker Hub username cannot be empty"; return 1; }
+
+    printf 'Docker Hub personal access token ("Public Repo Read-only" minimum): ' >&2
+    IFS= read -rs secret </dev/tty || return 2
+    printf '\n' >&2
+    [[ -n "$secret" ]] || { warn "Docker Hub personal access token cannot be empty"; return 1; }
+
+    if ! response=$(
+        printf '%s\n%s\n' "$identifier" "$secret" |
+            $JQ -Rnc '{identifier: input, secret: input}' |
+            $CURL -sS -w $'\n%{http_code}' \
+                -H 'Content-Type: application/json' \
+                --data-binary @- \
+                'https://hub.docker.com/v2/auth/token'
+    ); then
+        secret=
+        warn "Docker Hub authentication request failed"
+        return 1
+    fi
+    secret=
+    http_code="${response##*$'\n'}"
+    response_body="${response%$'\n'*}"
+    response=
+
+    if [[ "$http_code" == 200 ]]; then
+        token=$($JQ -r '.access_token // .token // empty' <<<"$response_body")
+        response_body=
+        if [[ -n "$token" ]]; then
+            printf '%s\n' "$token"
+            return 0
+        fi
+        warn "Docker Hub authentication response did not contain an access token"
+        return 1
+    fi
+
+    error_message=$(
+        $JQ -r '(.detail // .message // .error // empty) | if type == "string" then . else tostring end' \
+            <<<"$response_body" 2>/dev/null || true
+    )
+    response_body=
+    warn "Docker Hub authentication failed (HTTP $http_code)${error_message:+: $error_message}"
+    return 1
+}
+
+# Explain why anonymous pagination stopped and offer authentication or a
+# per-image skip. The access token is printed on success; return 1 for skip and
+# 2 when no controlling terminal is available.
+function choose_docker_hub_authentication {
+    local failure_message="$1"
+    local choice token auth_status
+
+    if [[ ! -t 0 && ! -t 1 && ! -t 2 ]]; then
+        return 2
+    fi
+    echo "$SCRIPT_NAME: Docker Hub refused further anonymous tag pagination." >&2
+    [[ -z "$failure_message" ]] || echo "  $failure_message" >&2
+    echo "  [a] Authenticate for this run with a Docker Hub username and PAT" >&2
+    echo "  [s] Skip this image" >&2
+    while true; do
+        printf 'Choose [a/s]: ' >&2
+        IFS= read -r choice </dev/tty || return 2
+        case "$choice" in
+        a | A)
+            if token=$(docker_hub_token_interactively); then
+                printf '%s\n' "$token"
+                return 0
+            else
+                auth_status=$?
+            fi
+            (( auth_status == 2 )) && return 2
+            ;;
+        s | S)
+            return 1
+            ;;
+        esac
+    done
+}
+
+# Ask whether to perform the exhaustive reverse lookup after the known local
+# tag has been checked. Return 0 for scan, 1 for no scan, and 2 when prompting
+# is unavailable.
+function choose_remote_tag_scan {
+    local choice
+
+    if [[ ! -t 0 && ! -t 1 && ! -t 2 ]]; then
+        return 2
+    fi
+    while true; do
+        printf 'Scan for every remote tag that matches this digest? [y/N]: ' >&2
+        IFS= read -r choice </dev/tty || return 2
+        case "$choice" in
+        y | Y | yes | YES | Yes) return 0 ;;
+        '' | n | N | no | NO | No) return 1 ;;
+        esac
+    done
+}
+
+# Print every current GHCR tag whose manifest has the requested digest. This
+# uses only GHCR's anonymous OCI Registry API, but requires one request per tag.
+function ghcr_tags_by_digest_anonymously {
+    local ghcr_repository="$1"
+    local digest="$2"
+    local token
+    local tags="" next_url next_link page_tags tag manifest_digest
+    local header_tmp body_tmp checked=0
+    local -a spinner=('|' '/' '-' $'\\')
+
+    info "Requesting an anonymous GHCR pull token"
+    token=$(ghcr_anonymous_pull_token "$ghcr_repository") || return 1
 
     header_tmp=$(mktemp)
     body_tmp=$(mktemp)
@@ -293,7 +547,7 @@ function ghcr_tags_by_digest_anonymously {
                 -D "$header_tmp" -o /dev/null \
                 "https://ghcr.io/v2/$ghcr_repository/manifests/$tag" 2>/dev/null; then
             manifest_digest=$(
-                awk 'tolower($1) == "docker-content-digest:" { gsub("\r", "", $2); print $2; exit }' "$header_tmp"
+                perl -ne 'if (/^docker-content-digest:\s*(\S+)/i) { print "$1\n"; exit }' "$header_tmp"
             )
             if [[ "$manifest_digest" == "$digest" ]]; then
                 printf '%s\n' "$tag"
@@ -480,341 +734,478 @@ for input in "$@"; do
     wildcard_reference=
     wildcard_repository=
 
-# A full repository digest is already unambiguous and does not need local
-# Docker metadata.
-if [[ "$input" == *@* ]]; then
-    if [[ "$input" =~ ^.+@sha256:[0-9a-f]{64}$ ]]; then
-        repo_digest="$input"
-        notice "Interpreting '$input' as a complete registry digest reference."
-    else
-        abort "'$input' looks like a registry digest reference, but expected repository@sha256:<64 lowercase hex characters>"
-    fi
-
-# SHA-like inputs are inherently ambiguous because Docker container IDs and
-# local image IDs are both hashes.  Probe in the documented order.
-elif [[ "$input" =~ ^([Ss][Hh][Aa]256:)?[0-9a-fA-F]{12,64}$ ]]; then
-    if resolved_image_id=$(
-        $DOCKER container inspect "$input" --format '{{.Image}}' 2>/dev/null
-    ); then
-        container="$input"
-        inspect_local_image "$resolved_image_id" ||
-            abort "Container '$container' refers to image '$resolved_image_id', but that image cannot be inspected"
-        notice "Resolved SHA-like '$input' as a local container ID (image $image_id)."
-    elif inspect_local_image "$input"; then
-        notice "Resolved SHA-like '$input' as local image ID $image_id."
-    else
-        registry_sha="$input"
-        [[ "$registry_sha" == *:* ]] && registry_sha="${registry_sha#*:}"
-        notice "No local container or image ID matched '$input'; assuming it is a registry digest."
-        if [[ ! "$registry_sha" =~ ^[0-9a-f]{64}$ ]]; then
-            abort "A registry digest must contain exactly 64 lowercase hex characters; pass repository@sha256:<digest> if it is not locally known"
-        fi
-        if ! matching_repo_digests=$(repo_digests_for_sha "$registry_sha"); then
-            abort "Cannot determine the repository for sha256:$registry_sha from local images; pass repository@sha256:$registry_sha"
-        fi
-        repo_digest="${matching_repo_digests%%$'\n'*}"
-        if [[ "$matching_repo_digests" == *$'\n'* ]]; then
-            warn "sha256:$registry_sha is associated with multiple local repositories; using '$repo_digest'. Pass a complete repository@sha256:... argument to select another."
+    # A full repository digest is already unambiguous and does not need local
+    # Docker metadata.
+    if [[ "$input" == *@* ]]; then
+        if [[ "$input" =~ ^.+@sha256:[0-9a-f]{64}$ ]]; then
+            repo_digest="$input"
+            notice "Interpreting '$input' as a complete registry digest reference."
         else
-            notice "Recovered registry reference '$repo_digest' from local image metadata."
+            abort "'$input' looks like a registry digest reference, but expected repository@sha256:<64 lowercase hex characters>"
         fi
-    fi
 
-# A slash identifies an image name, as does an explicit tag in the final path
-# component.  A literal :* requests an immediate wildcard scan.  For names
-# without an explicit tag, prefer Docker's normal implicit :latest resolution
-# and only then broaden the name to a :* match.
-elif [[ "$input" == */* || "${input##*/}" == *:* ]]; then
-    preferred_repository=$(repository_from_image_reference "$input")
-    final_component="${input##*/}"
-    if [[ "$final_component" == *:* && "${final_component##*:}" == '*' ]]; then
-        if ! wildcard_image_ids=$(image_ids_for_repository "$preferred_repository"); then
+    # SHA-like inputs are inherently ambiguous because Docker container IDs and
+    # local image IDs are both hashes.  Probe in the documented order.
+    elif [[ "$input" =~ ^([Ss][Hh][Aa]256:)?[0-9a-fA-F]{12,64}$ ]]; then
+        if resolved_image_id=$(
+            $DOCKER container inspect "$input" --format '{{.Image}}' 2>/dev/null
+        ); then
+            container="$input"
+            inspect_local_image "$resolved_image_id" ||
+                abort "Container '$container' refers to image '$resolved_image_id', but that image cannot be inspected"
+            notice "Resolved SHA-like '$input' as a local container ID (image $image_id)."
+        elif inspect_local_image "$input"; then
+            notice "Resolved SHA-like '$input' as local image ID $image_id."
+        else
+            registry_sha="$input"
+            [[ "$registry_sha" == *:* ]] && registry_sha="${registry_sha#*:}"
+            notice "No local container or image ID matched '$input'; assuming it is a registry digest."
+            if [[ ! "$registry_sha" =~ ^[0-9a-f]{64}$ ]]; then
+                abort "A registry digest must contain exactly 64 lowercase hex characters; pass repository@sha256:<digest> if it is not locally known"
+            fi
+            if ! matching_repo_digests=$(repo_digests_for_sha "$registry_sha"); then
+                abort "Cannot determine the repository for sha256:$registry_sha from local images; pass repository@sha256:$registry_sha"
+            fi
+            repo_digest="${matching_repo_digests%%$'\n'*}"
+            if [[ "$matching_repo_digests" == *$'\n'* ]]; then
+                warn "sha256:$registry_sha is associated with multiple local repositories; using '$repo_digest'. Pass a complete repository@sha256:... argument to select another."
+            else
+                notice "Recovered registry reference '$repo_digest' from local image metadata."
+            fi
+        fi
+
+    # A slash identifies an image name, as does an explicit tag in the final path
+    # component.  A literal :* requests an immediate wildcard scan.  For names
+    # without an explicit tag, prefer Docker's normal implicit :latest resolution
+    # and only then broaden the name to a :* match.
+    elif [[ "$input" == */* || "${input##*/}" == *:* ]]; then
+        preferred_repository=$(repository_from_image_reference "$input")
+        final_component="${input##*/}"
+        if [[ "$final_component" == *:* && "${final_component##*:}" == '*' ]]; then
+            if ! wildcard_image_ids=$(image_ids_for_repository "$preferred_repository"); then
+                abort "Cannot find any local image in repository '$preferred_repository'"
+            fi
+            wildcard_reference="$input"
+            wildcard_repository="$preferred_repository"
+            wildcard_count=0
+            while IFS= read -r wildcard_image_id; do
+                [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
+            done <<<"$wildcard_image_ids"
+            notice "Explicit wildcard '$input' requested; immediately checking $wildcard_count distinct local image(s)."
+        elif [[ "$final_component" == *:* ]]; then
+            inspect_local_image "$input" "$preferred_repository" "$input" ||
+                abort "Cannot inspect local image '$input'"
+            notice "Interpreting '$input' as a tagged local image reference."
+        elif inspect_local_image "$input" "$preferred_repository" "$preferred_repository:latest"; then
+            notice "Resolved '$input' using its implicit ':latest' tag; not scanning other local tags."
+        elif wildcard_image_ids=$(image_ids_for_repository "$preferred_repository"); then
+            wildcard_reference="$preferred_repository:*"
+            wildcard_repository="$preferred_repository"
+            wildcard_count=0
+            while IFS= read -r wildcard_image_id; do
+                [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
+            done <<<"$wildcard_image_ids"
+            notice "No local '$input:latest' image was found; interpreting '$input' as '$input:*' and checking $wildcard_count distinct local image(s)."
+        else
             abort "Cannot find any local image in repository '$preferred_repository'"
         fi
-        wildcard_reference="$input"
-        wildcard_repository="$preferred_repository"
-        wildcard_count=0
-        while IFS= read -r wildcard_image_id; do
-            [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
-        done <<<"$wildcard_image_ids"
-        notice "Explicit wildcard '$input' requested; immediately checking $wildcard_count distinct local image(s)."
-    elif [[ "$final_component" == *:* ]]; then
-        inspect_local_image "$input" "$preferred_repository" "$input" ||
-            abort "Cannot inspect local image '$input'"
-        notice "Interpreting '$input' as a tagged local image reference."
-    elif inspect_local_image "$input" "$preferred_repository" "$preferred_repository:latest"; then
-        notice "Resolved '$input' using its implicit ':latest' tag; not scanning other local tags."
-    elif wildcard_image_ids=$(image_ids_for_repository "$preferred_repository"); then
-        wildcard_reference="$preferred_repository:*"
-        wildcard_repository="$preferred_repository"
-        wildcard_count=0
-        while IFS= read -r wildcard_image_id; do
-            [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
-        done <<<"$wildcard_image_ids"
-        notice "No local '$input:latest' image was found; interpreting '$input' as '$input:*' and checking $wildcard_count distinct local image(s)."
+
+    # Otherwise prefer a container name, then permit an image name without an
+    # explicit tag.  The image lookup follows the same :latest-before-:* rule.
     else
-        abort "Cannot find any local image in repository '$preferred_repository'"
-    fi
-
-# Otherwise prefer a container name, then permit an image name without an
-# explicit tag.  The image lookup follows the same :latest-before-:* rule.
-else
-    if resolved_image_id=$(
-        $DOCKER container inspect "$input" --format '{{.Image}}' 2>/dev/null
-    ); then
-        container="$input"
-        inspect_local_image "$resolved_image_id" ||
-            abort "Container '$container' refers to image '$resolved_image_id', but that image cannot be inspected"
-        notice "Resolved '$input' as a local container name (image $image_id)."
-    elif inspect_local_image "$input" "$input" "$input:latest"; then
-        notice "No container named '$input' was found; resolved the image using its implicit ':latest' tag and will not scan other local tags."
-    elif wildcard_image_ids=$(image_ids_for_repository "$input"); then
-        wildcard_reference="$input:*"
-        wildcard_repository="$input"
-        wildcard_count=0
-        while IFS= read -r wildcard_image_id; do
-            [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
-        done <<<"$wildcard_image_ids"
-        notice "No container or local '$input:latest' image was found; interpreting '$input' as '$input:*' and checking $wildcard_count distinct local image(s)."
-    else
-        abort "Cannot resolve '$input' as a local container name or local image repository"
-    fi
-fi
-
-# Most arguments resolve to one lookup.  An untagged repository without a
-# local :latest image can expand to multiple distinct image IDs.
-images_to_process="${wildcard_image_ids:-__current_resolution__}"
-wildcard_output_index=0
-seen_wildcard_repo_digests=
-while IFS= read -r image_to_process; do
-    skip_input=
-    if [[ "$image_to_process" != __current_resolution__ ]]; then
-        container=
-        inspect_local_image "$image_to_process" "$wildcard_repository" || {
-            warn "Cannot inspect wildcard image match '$image_to_process'; skipping it"
-            continue
-        }
-    fi
-
-if [[ -z "$repo_digest" ]]; then
-    if [[ -n "$container" ]]; then
-        echo "No repository digest found for image '$image_id' (used by container '$container')" >&2
-    elif [[ -n "$wildcard_image_ids" ]]; then
-        warn "No repository digest found for wildcard image '$image_id'; skipping it"
-        continue
-    else
-        echo "No repository digest found for image '$image_id'" >&2
-    fi
-    exit 1
-fi
-
-if [[ -n "$wildcard_image_ids" ]]; then
-    if grep -Fxq -- "$repo_digest" <<<"$seen_wildcard_repo_digests"; then
-        notice "Skipping local image $image_id because repository digest '$repo_digest' was already checked."
-        continue
-    fi
-    seen_wildcard_repo_digests+="${seen_wildcard_repo_digests:+$'\n'}$repo_digest"
-    if (( wildcard_output_index > 0 )); then
-        separator_columns="${COLUMNS:-$(tput cols 2>/dev/null || true)}"
-        (( separator_columns > 0 )) || separator_columns=80
-        printf '%*s\n' "$separator_columns" '' | tr ' ' '-'
-    fi
-    ((++wildcard_output_index))
-    notice "Resolved '$wildcard_reference' to local image $image_id."
-fi
-
-# Split e.g. "nginx@sha256:abcd..." into repo and digest.
-repo="${repo_digest%%@*}"
-repo_sha="${repo_digest##*@}"
-
-# Canonicalize the digest: strip any "sha256:" prefix
-repo_sha="${repo_sha#sha256:}"
-
-if [[ -z "$local_tag" || "$local_tag" == "<none>:<none>" ]]; then
-    local_tag="<none>"
-else
-    local_tag="${local_tag##*:}"
-fi
-
-if [[ -n "$container" ]]; then
-    echo "Container: $container"
-    echo
-fi
-if [[ -n "$image_id" ]]; then
-    echo "Local Image ID: $image_id"
-fi
-echo "Repository:     $repo"
-echo "Package digest: ${repo_digest##*@}"
-echo
-if [[ -n "$image_id" ]]; then
-    echo "Local tag:  $local_tag"
-    echo
-fi
-registry_tags=""
-ghcr_lookup_status=""
-ghcr_version_json=""
-
-case "$repo" in
-ghcr.io/*)
-    ghcr_path="${repo#ghcr.io/}"
-    ghcr_digest="sha256:$repo_sha"
-    if [[ "$opt_ghcr_method" == anonymous ]]; then
-        if ! registry_tags=$(ghcr_tags_by_digest_anonymously "$ghcr_path" "$ghcr_digest"); then
-            abort "Anonymous GHCR lookup failed for $repo (is the package public?)"
+        if resolved_image_id=$(
+            $DOCKER container inspect "$input" --format '{{.Image}}' 2>/dev/null
+        ); then
+            container="$input"
+            inspect_local_image "$resolved_image_id" ||
+                abort "Container '$container' refers to image '$resolved_image_id', but that image cannot be inspected"
+            notice "Resolved '$input' as a local container name (image $image_id)."
+        elif inspect_local_image "$input" "$input" "$input:latest"; then
+            notice "No container named '$input' was found; resolved the image using its implicit ':latest' tag and will not scan other local tags."
+        elif wildcard_image_ids=$(image_ids_for_repository "$input"); then
+            wildcard_reference="$input:*"
+            wildcard_repository="$input"
+            wildcard_count=0
+            while IFS= read -r wildcard_image_id; do
+                [[ -n "$wildcard_image_id" ]] && ((++wildcard_count))
+            done <<<"$wildcard_image_ids"
+            notice "No container or local '$input:latest' image was found; interpreting '$input' as '$input:*' and checking $wildcard_count distinct local image(s)."
+        else
+            abort "Cannot resolve '$input' as a local container name or local image repository"
         fi
-        ghcr_lookup_status=anonymous
-    else
-        while true; do
-            if ghcr_version_json=$(ghcr_package_version_by_digest "$ghcr_path" "$ghcr_digest"); then
-                ghcr_lookup_status=found
-                registry_tags=$($JQ -r '.metadata.container.tags[]?' <<<"$ghcr_version_json")
-                break
-            fi
-            case "$?" in
-            1)
-                ghcr_lookup_status=not-found
-                break
-                ;;
-            esac
-
-            if [[ "$opt_ghcr_method" == packages ]]; then
-                abort "GitHub Packages API lookup failed; authenticate gh with read:packages scope"
-            fi
-
-            if command -v "${GH:=gh}" &>/dev/null; then
-                can_refresh=1
-            else
-                can_refresh=""
-            fi
-            if ! ghcr_choice=$(choose_ghcr_fallback "$can_refresh"); then
-                abort "GHCR lookup cancelled; no usable GitHub Packages credentials and anonymous scanning was not approved"
-            fi
-
-            case "$ghcr_choice" in
-            refresh)
-                if ! "$GH" auth refresh -s read:packages </dev/tty >/dev/tty; then
-                    warn "gh authentication refresh failed"
-                fi
-                # Retry the Packages API whether refresh succeeded or failed:
-                # the authentication flow may still have updated the token.
-                ;;
-            anonymous)
-                if ! registry_tags=$(ghcr_tags_by_digest_anonymously "$ghcr_path" "$ghcr_digest"); then
-                    abort "Anonymous GHCR lookup failed for $repo (is the package public?)"
-                fi
-                ghcr_lookup_status=anonymous
-                break
-                ;;
-            skip)
-                skip_input=1
-                break
-                ;;
-            esac
-        done
     fi
-    ;;
 
-*)
+    # Most arguments resolve to one lookup.  An untagged repository without a
+    # local :latest image can expand to multiple distinct image IDs.
+    images_to_process="${wildcard_image_ids:-__current_resolution__}"
+    wildcard_output_index=0
+    seen_wildcard_repo_digests=
+    while IFS= read -r image_to_process; do
+        skip_input=
+        if [[ "$image_to_process" != __current_resolution__ ]]; then
+            container=
+            inspect_local_image "$image_to_process" "$wildcard_repository" || {
+                warn "Cannot inspect wildcard image match '$image_to_process'; skipping it"
+                continue
+            }
+        fi
+
+    if [[ -z "$repo_digest" ]]; then
+        if [[ -n "$container" ]]; then
+            echo "No repository digest found for image '$image_id' (used by container '$container')" >&2
+        elif [[ -n "$wildcard_image_ids" ]]; then
+            warn "No repository digest found for wildcard image '$image_id'; skipping it"
+            continue
+        else
+            echo "No repository digest found for image '$image_id'" >&2
+        fi
+        exit 1
+    fi
+
+    if [[ -n "$wildcard_image_ids" ]]; then
+        if grep -Fxq -- "$repo_digest" <<<"$seen_wildcard_repo_digests"; then
+            notice "Skipping local image $image_id because repository digest '$repo_digest' was already checked."
+            continue
+        fi
+        seen_wildcard_repo_digests+="${seen_wildcard_repo_digests:+$'\n'}$repo_digest"
+        if (( wildcard_output_index > 0 )); then
+            separator_columns="${COLUMNS:-$(tput cols 2>/dev/null || true)}"
+            (( separator_columns > 0 )) || separator_columns=80
+            printf '%*s\n' "$separator_columns" '' | tr ' ' '-'
+        fi
+        ((++wildcard_output_index))
+        notice "Resolved '$wildcard_reference' to local image $image_id."
+    fi
+
+    # Split e.g. "nginx@sha256:abcd..." into repo and digest.
+    repo="${repo_digest%%@*}"
+    repo_sha="${repo_digest##*@}"
+
+    # Canonicalize the digest: strip any "sha256:" prefix
+    repo_sha="${repo_sha#sha256:}"
+
+    if [[ -z "$local_tag" || "$local_tag" == "<none>:<none>" ]]; then
+        local_tag="<none>"
+    else
+        local_tag="${local_tag##*:}"
+    fi
+
+    # Classify the registry once so the direct local-tag check and the optional
+    # exhaustive scan use the same normalization.
+    registry_kind=other
     first_component="${repo%%/*}"
-    if [[ "$repo" != */* ||
-            "$first_component" != *.* && "$first_component" != *:* &&
-            "$first_component" != localhost ]] ||
-            [[ "$first_component" == docker.io ||
-               "$first_component" == index.docker.io ||
-               "$first_component" == registry-1.docker.io ]]; then
-        # Docker Hub. Normalize official images and follow every API page.
-        hub_repo="$repo"
-        case "$hub_repo" in
-        docker.io/* | index.docker.io/* | registry-1.docker.io/*)
-            hub_repo="${hub_repo#*/}"
+    case "$repo" in
+    ghcr.io/*)
+        registry_kind=ghcr
+        ghcr_path="${repo#ghcr.io/}"
+        ;;
+    *)
+        if [[ "$repo" != */* ||
+                "$first_component" != *.* && "$first_component" != *:* &&
+                "$first_component" != localhost ]] ||
+                [[ "$first_component" == docker.io ||
+                "$first_component" == index.docker.io ||
+                "$first_component" == registry-1.docker.io ]]; then
+            registry_kind=docker-hub
+            hub_repo="$repo"
+            case "$hub_repo" in
+            docker.io/* | index.docker.io/* | registry-1.docker.io/*)
+                hub_repo="${hub_repo#*/}"
+                ;;
+            esac
+            if [[ "$hub_repo" != */* ]]; then
+                hub_repo="library/$hub_repo"
+            fi
+        fi
+        ;;
+    esac
+
+    if [[ -n "$container" ]]; then
+        echo "Container: $container"
+        echo
+    fi
+    if [[ -n "$image_id" ]]; then
+        echo "Local Image ID: $image_id"
+    fi
+    echo "Repository:     $repo"
+    echo "Package digest: ${repo_digest##*@}"
+    echo
+    if [[ -n "$image_id" ]]; then
+        echo "Local tag:  $local_tag"
+    fi
+
+    if [[ "$local_tag" == "<none>" ]]; then
+        echo "Remote tag check: unavailable because this image has no known local tag"
+    else
+        remote_tag_reference="$repo:$local_tag"
+        remote_tag_digest=
+        case "$registry_kind" in
+        docker-hub)
+            if remote_tag_digest=$(docker_hub_digest_for_tag "$hub_repo" "$local_tag"); then
+                remote_tag_status=0
+            else
+                remote_tag_status=$?
+            fi
+            ;;
+        ghcr)
+            if remote_tag_digest=$(ghcr_digest_for_tag "$ghcr_path" "$local_tag"); then
+                remote_tag_status=0
+            else
+                remote_tag_status=$?
+            fi
+            ;;
+        other)
+            SKOPEO="${SKOPEO:-skopeo}"
+            command -v "$SKOPEO" &>/dev/null ||
+                abort "Install skopeo to check registry tag '$remote_tag_reference'"
+            if remote_tag_digest=$(
+                $SKOPEO inspect --format '{{.Digest}}' "docker://$remote_tag_reference" 2>/dev/null
+            ); then
+                remote_tag_status=0
+            else
+                remote_tag_status=2
+            fi
             ;;
         esac
-        if [[ "$hub_repo" != */* ]]; then
-            hub_repo="library/$hub_repo"
-        fi
 
-        next_url="https://hub.docker.com/v2/repositories/$hub_repo/tags/?page_size=100"
-        response_tmp=$(mktemp)
-        while [[ -n "$next_url" ]]; do
-            info "Listing Docker Hub tags from: $next_url"
-            if ! $CURL -fsS -o "$response_tmp" "$next_url"; then
-                rm -f "$response_tmp"
-                abort "Failed to list tags for $repo"
+        case "$remote_tag_status" in
+        0)
+            if [[ "${remote_tag_digest#sha256:}" == "$repo_sha" ]]; then
+                echo "Remote tag check: MATCH — $remote_tag_reference still points to ${repo_digest##*@}"
+            else
+                echo "Remote tag check: MISMATCH — $remote_tag_reference now points to $remote_tag_digest"
             fi
-            # shellcheck disable=SC2016  # jq expression, not a shell expansion
-            matching_tags=$(
-                $JQ -r --arg digest "$repo_sha" '
-                    .results[]
-                    | select(((.digest // "") | ltrimstr("sha256:")) == $digest)
-                    | .name
-                ' "$response_tmp"
-            )
-            if [[ -n "$matching_tags" ]]; then
-                registry_tags+="${registry_tags:+$'\n'}$matching_tags"
-            fi
-            next_url=$($JQ -r '.next // empty' "$response_tmp")
-        done
-        rm -f "$response_tmp"
-    else
-        # For other OCI registries, skopeo supplies the same registry-level
-        # algorithm and reuses configured registry credentials when available.
-        SKOPEO="${SKOPEO:-skopeo}"
-        command -v "$SKOPEO" &>/dev/null ||
-            abort "Install skopeo to query registry '$first_component'"
+            ;;
+        1)
+            echo "Remote tag check: NOT FOUND — $remote_tag_reference no longer exists at the registry"
+            ;;
+        *)
+            abort "Failed to check remote tag '$remote_tag_reference'"
+            ;;
+        esac
+    fi
+    echo
 
-        info "Listing tags with skopeo for $repo"
-        tags=$(
-            $SKOPEO list-tags "docker://$repo" |
-                $JQ -r '.Tags[]?'
-        )
-        while IFS= read -r tag; do
-            [[ -z "$tag" ]] && continue
-            info "Resolving registry tag with skopeo: $tag"
-            if ! manifest_digest=$(
-                $SKOPEO inspect --format '{{.Digest}}' "docker://$repo:$tag" 2>/dev/null
-            ); then
+    if [[ -n "$opt_local_only" ]]; then
+        continue
+    fi
+    if [[ -z "$opt_all" ]]; then
+        if choose_remote_tag_scan; then
+            :
+        else
+            scan_choice_status=$?
+            if (( scan_choice_status == 1 )); then
                 continue
             fi
-            if [[ "${manifest_digest#sha256:}" == "$repo_sha" ]]; then
-                registry_tags+="$tag"$'\n'
+            abort "Cannot prompt to scan remote tags; rerun with --local-only or --all"
+        fi
+    fi
+
+    registry_tags=""
+    ghcr_lookup_status=""
+    ghcr_version_json=""
+
+    case "$repo" in
+    ghcr.io/*)
+        ghcr_path="${repo#ghcr.io/}"
+        ghcr_digest="sha256:$repo_sha"
+        if [[ "$opt_ghcr_method" == anonymous ]]; then
+            if ! registry_tags=$(ghcr_tags_by_digest_anonymously "$ghcr_path" "$ghcr_digest"); then
+                abort "Anonymous GHCR lookup failed for $repo (is the package public?)"
             fi
-        done <<<"$tags"
-        registry_tags=${registry_tags%$'\n'}
-    fi
-    ;;
-esac
+            ghcr_lookup_status=anonymous
+        else
+            while true; do
+                if ghcr_version_json=$(ghcr_package_version_by_digest "$ghcr_path" "$ghcr_digest"); then
+                    ghcr_lookup_status=found
+                    registry_tags=$($JQ -r '.metadata.container.tags[]?' <<<"$ghcr_version_json")
+                    break
+                fi
+                case "$?" in
+                1)
+                    ghcr_lookup_status=not-found
+                    break
+                    ;;
+                esac
 
-if [[ -n "$skip_input" ]]; then
-    continue
-fi
+                if [[ "$opt_ghcr_method" == packages ]]; then
+                    abort "GitHub Packages API lookup failed; authenticate gh with read:packages scope"
+                fi
 
-echo "Registry tag(s):"
-printf '%s\n' "${registry_tags:-<none>}"
+                if command -v "${GH:=gh}" &>/dev/null; then
+                    can_refresh=1
+                else
+                    can_refresh=""
+                fi
+                if ! ghcr_choice=$(choose_ghcr_fallback "$can_refresh"); then
+                    abort "GHCR lookup cancelled; no usable GitHub Packages credentials and anonymous scanning was not approved"
+                fi
 
-case "$ghcr_lookup_status" in
-found)
-    package_current_tags=$(
-        $JQ -r '
-            .metadata.container.tags // []
-            | if length == 0 then "none" else join(", ") end
-        ' <<<"$ghcr_version_json"
-    )
-    echo
-    echo "GHCR package info:"
-    echo "Created:      $($JQ -r '.created_at // "unknown"' <<<"$ghcr_version_json")"
-    echo "Updated:      $($JQ -r '.updated_at // "unknown"' <<<"$ghcr_version_json")"
-    if [[ "$package_current_tags" == none ]]; then
-        echo "Note: the digest is still an active GHCR package version, but no current tag points to it."
+                case "$ghcr_choice" in
+                refresh)
+                    if ! "$GH" auth refresh -s read:packages </dev/tty >/dev/tty; then
+                        warn "gh authentication refresh failed"
+                    fi
+                    # Retry the Packages API whether refresh succeeded or failed:
+                    # the authentication flow may still have updated the token.
+                    ;;
+                anonymous)
+                    if ! registry_tags=$(ghcr_tags_by_digest_anonymously "$ghcr_path" "$ghcr_digest"); then
+                        abort "Anonymous GHCR lookup failed for $repo (is the package public?)"
+                    fi
+                    ghcr_lookup_status=anonymous
+                    break
+                    ;;
+                skip)
+                    skip_input=1
+                    break
+                    ;;
+                esac
+            done
+        fi
+        ;;
+
+    *)
+        first_component="${repo%%/*}"
+        if [[ "$repo" != */* ||
+                "$first_component" != *.* && "$first_component" != *:* &&
+                "$first_component" != localhost ]] ||
+                [[ "$first_component" == docker.io ||
+                "$first_component" == index.docker.io ||
+                "$first_component" == registry-1.docker.io ]]; then
+            # Docker Hub. Normalize official images and follow every API page.
+            hub_repo="$repo"
+            case "$hub_repo" in
+            docker.io/* | index.docker.io/* | registry-1.docker.io/*)
+                hub_repo="${hub_repo#*/}"
+                ;;
+            esac
+            if [[ "$hub_repo" != */* ]]; then
+                hub_repo="library/$hub_repo"
+            fi
+
+            next_url="https://hub.docker.com/v2/repositories/$hub_repo/tags/?page_size=100"
+            response_tmp=$(mktemp)
+            while [[ -n "$next_url" ]]; do
+                info "Listing Docker Hub tags from: $next_url"
+                docker_hub_request_args=(-sS -o "$response_tmp" -w '%{http_code}')
+                if [[ -n "$docker_hub_token" ]]; then
+                    docker_hub_request_args+=(-H "Authorization: Bearer $docker_hub_token")
+                fi
+                if ! docker_hub_http_code=$(
+                    $CURL "${docker_hub_request_args[@]}" "$next_url"
+                ); then
+                    rm -f "$response_tmp"
+                    abort "Failed to list tags for $repo"
+                fi
+                docker_hub_error_message=$(
+                    $JQ -r '
+                        (.message // .detail // .error // empty)
+                        | if type == "string" then gsub("[\\r\\n]+"; " ") else tostring end
+                    ' "$response_tmp" 2>/dev/null || true
+                )
+                case "$docker_hub_http_code" in
+                200) ;;
+                401 | 403)
+                    if [[ -n "$docker_hub_token" ]]; then
+                        rm -f "$response_tmp"
+                        abort "Authenticated Docker Hub request failed with HTTP $docker_hub_http_code${docker_hub_error_message:+: $docker_hub_error_message}"
+                    fi
+                    if docker_hub_token=$(
+                        choose_docker_hub_authentication \
+                            "HTTP $docker_hub_http_code${docker_hub_error_message:+: $docker_hub_error_message}"
+                    ); then
+                        continue
+                    else
+                        docker_hub_auth_status=$?
+                    fi
+                    if (( docker_hub_auth_status == 1 )); then
+                        notice "Skipping Docker Hub lookup for $repo."
+                        skip_input=1
+                        break
+                    fi
+                    rm -f "$response_tmp"
+                    abort "Docker Hub authentication requires an interactive terminal"
+                    ;;
+                *)
+                    rm -f "$response_tmp"
+                    abort "Docker Hub tag listing failed with HTTP $docker_hub_http_code${docker_hub_error_message:+: $docker_hub_error_message}"
+                    ;;
+                esac
+                # shellcheck disable=SC2016  # jq expression, not a shell expansion
+                matching_tags=$(
+                    $JQ -r --arg digest "$repo_sha" '
+                        .results[]
+                        | select(((.digest // "") | ltrimstr("sha256:")) == $digest)
+                        | .name
+                    ' "$response_tmp"
+                )
+                if [[ -n "$matching_tags" ]]; then
+                    registry_tags+="${registry_tags:+$'\n'}$matching_tags"
+                fi
+                next_url=$($JQ -r '.next // empty' "$response_tmp")
+            done
+            rm -f "$response_tmp"
+        else
+            # For other OCI registries, skopeo supplies the same registry-level
+            # algorithm and reuses configured registry credentials when available.
+            SKOPEO="${SKOPEO:-skopeo}"
+            command -v "$SKOPEO" &>/dev/null ||
+                abort "Install skopeo to query registry '$first_component'"
+
+            info "Listing tags with skopeo for $repo"
+            tags=$(
+                $SKOPEO list-tags "docker://$repo" |
+                    $JQ -r '.Tags[]?'
+            )
+            while IFS= read -r tag; do
+                [[ -z "$tag" ]] && continue
+                info "Resolving registry tag with skopeo: $tag"
+                if ! manifest_digest=$(
+                    $SKOPEO inspect --format '{{.Digest}}' "docker://$repo:$tag" 2>/dev/null
+                ); then
+                    continue
+                fi
+                if [[ "${manifest_digest#sha256:}" == "$repo_sha" ]]; then
+                    registry_tags+="$tag"$'\n'
+                fi
+            done <<<"$tags"
+            registry_tags=${registry_tags%$'\n'}
+        fi
+        ;;
+    esac
+
+    if [[ -n "$skip_input" ]]; then
+        continue
     fi
-    ;;
-not-found)
-    warn "No active GHCR package version was found for sha256:$repo_sha"
-    ;;
-anonymous)
-    if [[ -z "$registry_tags" ]]; then
-        warn "No current GHCR tag was found for sha256:$repo_sha"
-    fi
-    ;;
-esac
-done <<<"$images_to_process"
+
+    echo "Registry tag(s):"
+    printf '%s\n' "${registry_tags:-<none>}"
+
+    case "$ghcr_lookup_status" in
+    found)
+        package_current_tags=$(
+            $JQ -r '
+                .metadata.container.tags // []
+                | if length == 0 then "none" else join(", ") end
+            ' <<<"$ghcr_version_json"
+        )
+        echo
+        echo "GHCR package info:"
+        echo "Created:      $($JQ -r '.created_at // "unknown"' <<<"$ghcr_version_json")"
+        echo "Updated:      $($JQ -r '.updated_at // "unknown"' <<<"$ghcr_version_json")"
+        if [[ "$package_current_tags" == none ]]; then
+            echo "Note: the digest is still an active GHCR package version, but no current tag points to it."
+        fi
+        ;;
+    not-found)
+        warn "No active GHCR package version was found for sha256:$repo_sha"
+        ;;
+    anonymous)
+        if [[ -z "$registry_tags" ]]; then
+            warn "No current GHCR tag was found for sha256:$repo_sha"
+        fi
+        ;;
+    esac
+    done <<<"$images_to_process"
 done
