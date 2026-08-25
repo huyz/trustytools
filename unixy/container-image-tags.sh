@@ -1,4 +1,6 @@
 #!/bin/bash
+# XXX(2026-08-25): Deprecated. Go to https://github.com/huyz/container-image-tags
+#
 # Given a Docker container, local image, or registry digest, this checks
 # whether its known local tag still points to the same remote digest. It can
 # then find every current remote registry tag for that digest. Each argument
@@ -98,6 +100,11 @@ function err { printf "%s: ❗ ERROR: %s\n" "$SCRIPT_NAME" "$*" >&2; }
 function abort { printf "%s: ❌ ERROR: %s\n" "$SCRIPT_NAME" "$*" >&2; exit 1; }
 
 function notice { printf "ℹ️ %s\n" "$*" >&2; }
+
+#### Deprecated
+
+warn "🛑 This script is deprecated. Go to https://github.com/huyz/container-image-tags"
+echo >&2
 
 #### Options
 
