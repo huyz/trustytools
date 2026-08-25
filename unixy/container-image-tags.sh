@@ -623,6 +623,10 @@ function inspect_local_image {
         $DOCKER image inspect "$image_id" \
             --format='{{range .RepoTags}}{{println .}}{{end}}' 2>/dev/null
     ) || return 1
+    local_image_version=$(
+        $DOCKER image inspect "$image_id" \
+            --format='{{with index .Config.Labels "org.opencontainers.image.version"}}{{.}}{{end}}' 2>/dev/null
+    ) || return 1
 
     repo_digest=
     local_tag=
@@ -728,6 +732,7 @@ for input in "$@"; do
     skip_input=
     container=
     image_id=
+    local_image_version=
     repo_digest=
     local_tag=
     wildcard_image_ids=
@@ -926,6 +931,9 @@ for input in "$@"; do
     fi
     if [[ -n "$image_id" ]]; then
         echo "Local Image ID: $image_id"
+        if [[ -n "$local_image_version" ]]; then
+            echo "Image version:  $local_image_version"
+        fi
     fi
     echo "Repository:     $repo"
     echo "Package digest: ${repo_digest##*@}"
