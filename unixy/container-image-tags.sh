@@ -46,7 +46,7 @@
 #### Preamble (v2026-08-24)
 
 set -Eeuo pipefail
-shopt -s failglob inherit_errexit
+shopt -s failglob
 SCRIPT_NAME=${BASH_SOURCE[0]##*/}
 # shellcheck disable=SC2329
 function trap_err { local rc=$?; printf '%s: ERROR: command failed with status %d at %s:%d: %s\n' \
@@ -62,21 +62,17 @@ if [[ $OSTYPE == darwin* ]]; then
         { echo "$0: ERROR: \`$_install_cmd gnu-getopt\` to install $GETOPT." >&2; exit 1; }
     [[ -x "${REALPATH:="$HOMEBREW_PREFIX/bin/grealpath"}" ]] || \
         { echo "$0: ERROR: \`$_install_cmd coreutils\` to install $REALPATH." >&2; exit 1; }
-    [[ -x "${JQ:="$HOMEBREW_PREFIX/bin/jq"}" ]] || \
-        { echo "$0: ERROR: \`$_install_cmd jq\` to install $JQ." >&2; exit 1; }
-    [[ -x "${DOCKER:="$HOMEBREW_PREFIX/bin/docker"}" ]] || \
-        { echo "$0: ERROR: \`$_install_cmd docker\` to install $DOCKER." >&2; exit 1; }
 else
     _install_cmd="sudo apt install"
     GETOPT="getopt"
     REALPATH="realpath"
-    command -v "${JQ:=jq}" &>/dev/null || \
-        { echo "$0: ERROR: \`$_install_cmd jq\` to install $JQ." >&2; exit 1; }
-    command -v "${DOCKER:=docker}" &>/dev/null || \
-        { echo "$0: ERROR: \`$_install_cmd docker\` to install $DOCKER." >&2; exit 1; }
 fi
 command -v "${CURL:=curl}" &>/dev/null ||
     { echo "$0: ERROR: \`$_install_cmd curl\` to install $CURL." >&2; exit 1; }
+command -v "${JQ:=jq}" &>/dev/null || \
+    { echo "$0: ERROR: \`$_install_cmd jq\` to install $JQ." >&2; exit 1; }
+command -v "${DOCKER:=docker}" &>/dev/null || \
+    { echo "$0: ERROR: \`$_install_cmd docker\` to install $DOCKER." >&2; exit 1; }
 
 SCRIPT=$("$REALPATH" --no-symlinks "${BASH_SOURCE[0]}")
 # shellcheck disable=SC2034
@@ -134,12 +130,12 @@ Private registry access reuses credentials configured by docker login, skopeo
 login, or podman login; credential values are never passed on this command line.
 
 Arguments are interpreted as follows:
-        repository@sha256:...: use this registry digest directly
-        repository:*: immediately match every local tag in that repository
-        image name with an explicit tag: inspect that exact local image
-        SHA-like value: try a local container ID, then a local image ID, then a registry digest
-        image name without a tag (including names with '/'): try ':latest', then match every local repository tag
-        any other value: try a container name before treating it as an image name
+    - repository@sha256:... → use this registry digest exactly
+    - repository:* → check every local tag for that repository
+    - repository:tag → check this exact local for that repository
+    - repository (when its form includes '…/…') → assume ':latest'; if not present locally, treat as 'repository:*'
+    - SHA-like value → try a local container ID, then a local image ID, then a registry digest
+    - any other value → try a container name before treating it as repository (an image name without a tag)
 END
 }
 
