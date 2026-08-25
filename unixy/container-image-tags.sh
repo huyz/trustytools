@@ -28,9 +28,12 @@
 # - curl
 # - jq
 # - docker CLI
+# - registry credentials configured by docker login, skopeo login, or podman
+#   login, for private registries
 # - Docker Hub username and PAT, only if an exhaustive anonymous scan is refused
 # - authenticated gh CLI with read:packages scope, optional fast path for GHCR
-# - skopeo, only for registries other than Docker Hub and GHCR
+# - skopeo, for private-registry fallback and registries other than Docker Hub
+#   and GHCR
 #
 # TIP:
 # - To list all the Repo digests for your containers:
@@ -127,6 +130,8 @@ By default, each known local tag is checked first, then you are asked whether
 to scan the registry for every tag that points to the same digest.
 Docker Hub scans start anonymously. If deeper pagination requires sign-in, an
 interactive run can exchange a username and PAT for an in-memory access token.
+Private registry access reuses credentials configured by docker login, skopeo
+login, or podman login; credential values are never passed on this command line.
 
 Arguments are interpreted as follows:
         repository@sha256:...: use this registry digest directly
@@ -164,6 +169,68 @@ if [[ -n "$opt_local_only" && -n "$opt_all" ]]; then
 fi
 
 [[ $# -ge 1 ]] || { usage >&2; exit 1; }
+
+# Skopeo reads credentials written by skopeo/podman login and, as a fallback,
+# Docker's config.json (including credential helpers).  Keep all Skopeo calls
+# behind these helpers so private-registry behavior is consistent for the
+# direct tag check and the exhaustive reverse lookup.
+function skopeo_is_available {
+    SKOPEO="${SKOPEO:-skopeo}"
+    command -v "$SKOPEO" &>/dev/null
+}
+
+function skopeo_has_registry_credentials {
+    local registry="$1"
+
+    skopeo_is_available &&
+        "$SKOPEO" login --get-login "$registry" >/dev/null 2>&1
+}
+
+function skopeo_digest_for_tag {
+    local image_reference="$1"
+
+    skopeo_is_available || return 127
+    "$SKOPEO" inspect --format '{{.Digest}}' "docker://$image_reference" 2>/dev/null
+}
+
+function skopeo_tags_by_digest {
+    local repository="$1"
+    local digest="$2"
+    local tags tag manifest_digest
+    local checked=0
+    local matches=
+    local -a spinner=('|' '/' '-' $'\\')
+
+    skopeo_is_available || return 127
+    info "Listing registry tags with skopeo for $repository"
+    tags=$(
+        "$SKOPEO" list-tags "docker://$repository" |
+            $JQ -r '.Tags[]?'
+    ) || return 1
+
+    if [[ -z ${opt_verbose-} ]]; then
+        printf 'Searching registry tags with skopeo... %s (0 checked)' "${spinner[0]}" >&2
+    fi
+    while IFS= read -r tag; do
+        [[ -n "$tag" ]] || continue
+        info "Resolving registry tag with skopeo: $tag"
+        if manifest_digest=$(skopeo_digest_for_tag "$repository:$tag"); then
+            if [[ "$manifest_digest" == "$digest" ]]; then
+                matches+="${matches:+$'\n'}$tag"
+            fi
+        fi
+        ((++checked))
+        if [[ -z ${opt_verbose-} ]]; then
+            printf '\rSearching registry tags with skopeo... %s (%d checked)' \
+                "${spinner[checked % 4]}" "$checked" >&2
+        fi
+    done <<<"$tags"
+    if [[ -z ${opt_verbose-} ]]; then
+        printf '\rSearching registry tags with skopeo... done (%d checked)\n' "$checked" >&2
+    fi
+
+    printf '%s' "$matches"
+}
 
 # Look up an active GHCR package version by immutable digest or current tag.
 # GitHub's Packages API exposes the digest, timestamps, and current tags in the
@@ -335,6 +402,13 @@ function ghcr_digest_for_tag {
         return 0
     else
         lookup_status=$?
+    fi
+
+    if [[ "$lookup_status" == 2 && "$opt_ghcr_method" == auto ]] &&
+            manifest_digest=$(skopeo_digest_for_tag "ghcr.io/$ghcr_repository:$tag"); then
+        info "Resolved private GHCR tag with configured registry credentials"
+        printf '%s\n' "$manifest_digest"
+        return 0
     fi
     return "$lookup_status"
 }
@@ -954,6 +1028,11 @@ for input in "$@"; do
             else
                 remote_tag_status=$?
             fi
+            if [[ "$remote_tag_status" == 2 ]] &&
+                    remote_tag_digest=$(skopeo_digest_for_tag "$remote_tag_reference"); then
+                info "Resolved Docker Hub tag with configured registry credentials"
+                remote_tag_status=0
+            fi
             ;;
         ghcr)
             if remote_tag_digest=$(ghcr_digest_for_tag "$ghcr_path" "$local_tag"); then
@@ -963,12 +1042,9 @@ for input in "$@"; do
             fi
             ;;
         other)
-            SKOPEO="${SKOPEO:-skopeo}"
-            command -v "$SKOPEO" &>/dev/null ||
+            skopeo_is_available ||
                 abort "Install skopeo to check registry tag '$remote_tag_reference'"
-            if remote_tag_digest=$(
-                $SKOPEO inspect --format '{{.Digest}}' "docker://$remote_tag_reference" 2>/dev/null
-            ); then
+            if remote_tag_digest=$(skopeo_digest_for_tag "$remote_tag_reference"); then
                 remote_tag_status=0
             else
                 remote_tag_status=2
@@ -1035,6 +1111,16 @@ for input in "$@"; do
                     break
                     ;;
                 esac
+
+                if [[ "$opt_ghcr_method" == auto ]] &&
+                        skopeo_has_registry_credentials ghcr.io; then
+                    notice "Using configured registry credentials for private GHCR lookup."
+                    if ! registry_tags=$(skopeo_tags_by_digest "$repo" "$ghcr_digest"); then
+                        abort "Authenticated Skopeo lookup failed for $repo"
+                    fi
+                    ghcr_lookup_status=skopeo
+                    break
+                fi
 
                 if [[ "$opt_ghcr_method" == packages ]]; then
                     abort "GitHub Packages API lookup failed; authenticate gh with read:packages scope"
@@ -1119,6 +1205,15 @@ for input in "$@"; do
                         rm -f "$response_tmp"
                         abort "Authenticated Docker Hub request failed with HTTP $docker_hub_http_code${docker_hub_error_message:+: $docker_hub_error_message}"
                     fi
+                    if skopeo_has_registry_credentials docker.io; then
+                        notice "Using configured registry credentials for private Docker Hub lookup."
+                        if ! registry_tags=$(skopeo_tags_by_digest "$repo" "sha256:$repo_sha"); then
+                            rm -f "$response_tmp"
+                            abort "Authenticated Skopeo lookup failed for $repo"
+                        fi
+                        next_url=
+                        break
+                    fi
                     if docker_hub_token=$(
                         choose_docker_hub_authentication \
                             "HTTP $docker_hub_http_code${docker_hub_error_message:+: $docker_hub_error_message}"
@@ -1157,28 +1252,10 @@ for input in "$@"; do
         else
             # For other OCI registries, skopeo supplies the same registry-level
             # algorithm and reuses configured registry credentials when available.
-            SKOPEO="${SKOPEO:-skopeo}"
-            command -v "$SKOPEO" &>/dev/null ||
+            skopeo_is_available ||
                 abort "Install skopeo to query registry '$first_component'"
-
-            info "Listing tags with skopeo for $repo"
-            tags=$(
-                $SKOPEO list-tags "docker://$repo" |
-                    $JQ -r '.Tags[]?'
-            )
-            while IFS= read -r tag; do
-                [[ -z "$tag" ]] && continue
-                info "Resolving registry tag with skopeo: $tag"
-                if ! manifest_digest=$(
-                    $SKOPEO inspect --format '{{.Digest}}' "docker://$repo:$tag" 2>/dev/null
-                ); then
-                    continue
-                fi
-                if [[ "${manifest_digest#sha256:}" == "$repo_sha" ]]; then
-                    registry_tags+="$tag"$'\n'
-                fi
-            done <<<"$tags"
-            registry_tags=${registry_tags%$'\n'}
+            registry_tags=$(skopeo_tags_by_digest "$repo" "sha256:$repo_sha") ||
+                abort "Skopeo lookup failed for $repo"
         fi
         ;;
     esac
