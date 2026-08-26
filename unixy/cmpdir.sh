@@ -143,6 +143,7 @@ cmd=(rsync --dry-run --itemize-changes --archive --hard-links \
     --exclude='.DS_Store' \
     --exclude='.git' \
     --exclude='.idea' \
+    --exclude='.jj' \
     --exclude='.mypy_cache' \
     --exclude='.venv' \
     --exclude='.vscode' \
